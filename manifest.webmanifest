@@ -1,0 +1,10 @@
+{
+  "name": "JALMITRA 360",
+  "short_name": "JALMITRA",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#f7fbff",
+  "theme_color": "#06458f",
+  "lang": "hi",
+  "description": "भारत में पानी संबंधी शिकायत दर्ज करने का नागरिक मंच"
+}

@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="hi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#06458f">
+  <title>JALMITRA 360</title>
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <div class="app-shell">
+    <header class="topbar">
+      <button class="icon-btn" id="menuBtn" aria-label="मेन्यू">☰</button>
+      <div class="topbrand"><span class="drop">💧</span><span>JALMITRA <b>360</b><small>WATER COMPLAINT PLATFORM · INDIA</small></span></div>
+      <button class="icon-btn notification" id="notificationBtn" aria-label="सूचनाएं">♧<i id="noticeCount">0</i></button>
+    </header>
+    <nav class="drawer hidden" id="drawer">
+      <button data-page="home">⌂ होम</button><button data-page="track">⌕ शिकायत ट्रैक करें</button>
+      <button data-page="about">ⓘ हमारे बारे में</button><button data-page="admin">⚙ एडमिन पैनल</button>
+    </nav>
+    <main>
+      <section class="page active" id="home">
+        <div class="hero">
+          <div class="sky">☁️　☀️　☁️</div>
+          <div class="logo-drop">💧<span>🇮🇳</span></div>
+          <h1>JALMITRA <b>360</b></h1>
+          <h2>आपकी शिकायत, हमारी जानकारी</h2>
+          <p>हर बूंद की जिम्मेदारी 💧</p>
+          <div class="waterline">〰️〰️〰️〰️〰️〰️〰️</div>
+        </div>
+        <div class="home-actions">
+          <button class="primary big" data-page="complaint">📢　नई शिकायत दर्ज करें <span>›</span><small>(सभी के लिए)</small></button>
+          <button class="secondary big" data-page="track">⌕　अपनी शिकायत ट्रैक करें <small>(Report ID से)</small></button>
+          <div class="quick-grid">
+            <button data-page="about">ⓘ<small>हमारे बारे में</small></button>
+            <button data-page="stats">▥<small>सांख्यिकी</small></button>
+            <button data-page="contact">☎<small>संपर्क करें</small></button>
+          </div>
+        </div>
+        <div class="slogan">🇮🇳　जल बचाएं · जीवन बचाएं</div>
+      </section>
+
+      <section class="page" id="complaint">
+        <div class="page-heading"><button class="back" data-page="home">‹</button> 💧 शिकायत दर्ज करें</div>
+        <form id="complaintForm" class="panel">
+          <label>आपका नाम <em>*</em><input name="name" required maxlength="80" placeholder="अपना पूरा नाम"></label>
+          <label>मोबाइल नंबर <em>*</em><input name="phone" required inputmode="numeric" pattern="[0-9]{10}" maxlength="10" placeholder="10 अंकों का मोबाइल नंबर"></label>
+          <label>राज्य <em>*</em><select name="state" id="state" required><option value="">राज्य चुनें</option></select></label>
+          <label>जिला <em>*</em><input name="district" required placeholder="जिले का नाम"></label>
+          <label>गांव / शहर <em>*</em><input name="place" required placeholder="गांव, शहर या वार्ड"></label>
+          <label>समस्या का प्रकार <em>*</em><select name="type" required><option value="">समस्या चुनें</option><option>पाइपलाइन में लीकेज</option><option>सार्वजनिक नल से पानी बहना</option><option>हैंडपंप खराब</option><option>पानी की टंकी ओवरफ्लो</option><option>सड़क पर पानी की बर्बादी</option><option>पीने के पानी की समस्या</option><option>गंदा पानी / जल प्रदूषण</option><option>अन्य</option></select></label>
+          <label>समस्या का विवरण <em>*</em><textarea name="details" rows="4" required maxlength="1200" placeholder="समस्या कहां है और क्या हो रहा है?"></textarea></label>
+          <label class="upload">📷 फोटो अपलोड करें <small>(वैकल्पिक)</small><input type="file" name="photo" accept="image/*"></label>
+          <p class="hint">डेमो संस्करण: जानकारी इसी डिवाइस में सेव होगी।</p>
+          <button class="primary submit" type="submit">➤　शिकायत जमा करें</button>
+        </form>
+      </section>
+
+      <section class="page" id="success">
+        <div class="page-heading"><button class="back" data-page="home">‹</button> सफलता</div>
+        <div class="success-card">
+          <div class="check">✓</div><h2>शिकायत सफलतापूर्वक जमा हो गई!</h2>
+          <p>आपकी शिकायत का Report ID है:</p>
+          <div class="report-id" id="successId">JM360-00000000-001</div>
+          <p>इसे सुरक्षित रखें और अपनी शिकायत की स्थिति यहां देखें।</p>
+          <button class="primary" data-page="track">⌕　मेरी शिकायत ट्रैक करें</button>
+          <div class="mail-note">✉️　नई शिकायत की सूचना ईमेल पर भेजने के लिए सर्वर ईमेल सेटअप आवश्यक है।</div>
+          <button class="outline-green" data-page="home">⌂　होम पर जाएं</button>
+        </div>
+      </section>
+
+      <section class="page" id="track">
+        <div class="page-heading"><button class="back" data-page="home">‹</button> शिकायत ट्रैक करें</div>
+        <div class="panel">
+          <label>Report ID दर्ज करें<input id="trackId" placeholder="JM360-YYYYMMDD-001"></label>
+          <button class="primary submit" id="trackBtn">⌕　स्थिति देखें</button>
+          <div id="trackResult"></div>
+        </div>
+      </section>
+
+      <section class="page" id="admin">
+        <div class="page-heading"><button class="back" data-page="home">‹</button> 🛡 एडमिन पैनल</div>
+        <div class="panel" id="adminLogin">
+          <h3>एडमिन लॉगिन</h3>
+          <p class="hint">यह केवल डेमो स्क्रीन है। असली सुरक्षा Firebase Authentication से जोड़ें।</p>
+          <label>ईमेल<input id="adminEmail" type="email" placeholder="Admin email"></label>
+          <label>पासवर्ड<input id="adminPassword" type="password" placeholder="Password"></label>
+          <button class="primary submit" id="adminLoginBtn">लॉगिन</button>
+          <p id="adminMsg" class="hint"></p>
+        </div>
+        <div id="adminDashboard" class="hidden">
+          <div class="stats-grid">
+            <div class="stat blue">💧<small>कुल शिकायतें</small><b id="totalCount">0</b></div>
+            <div class="stat green">✅<small>नई शिकायतें</small><b id="newCount">0</b></div>
+            <div class="stat orange">🕒<small>लंबित</small><b id="pendingCount">0</b></div>
+            <div class="stat purple">✔<small>हल की गई</small><b id="doneCount">0</b></div>
+          </div>
+          <h3>हाल की शिकायतें</h3><div id="adminList"></div>
+        </div>
+      </section>
+
+      <section class="page" id="stats"><div class="page-heading"><button class="back" data-page="home">‹</button> सांख्यिकी</div><div class="panel"><h2>जल संरक्षण में भागीदारी</h2><p id="statsText">शिकायतें दर्ज होने पर आंकड़े यहां दिखेंगे।</p></div></section>
+      <section class="page" id="about"><div class="page-heading"><button class="back" data-page="home">‹</button> हमारे बारे में</div><div class="panel"><h2>हर बूंद की जिम्मेदारी</h2><p>JALMITRA 360 पानी से जुड़ी समस्याओं की जानकारी एकत्र करने का नागरिक मंच है। यह मंच स्वयं सरकारी कार्रवाई या समस्या के समाधान की गारंटी नहीं देता।</p></div></section>
+      <section class="page" id="contact"><div class="page-heading"><button class="back" data-page="home">‹</button> संपर्क करें</div><div class="panel"><h2>JALMITRA 360 सहायता</h2><p>संपर्क ईमेल और फोन नंबर यहां अपने आधिकारिक विवरण से जोड़ें।</p></div></section>
+    </main>
+    <footer class="bottom-nav">
+      <button class="selected" data-page="home">⌂<small>होम</small></button>
+      <button data-page="track">▤<small>मेरी रिपोर्ट</small></button>
+      <button id="bottomNotice">♧<small>नोटिफिकेशन</small></button>
+      <button data-page="admin">⚙<small>एडमिन</small></button>
+    </footer>
+  </div>
+  <script src="app.js"></script>
+</body>
+</html>
