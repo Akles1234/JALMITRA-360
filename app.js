@@ -1,3 +1,4 @@
+
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
 
 import {
@@ -33,6 +34,11 @@ const firebaseConfig = {
 const ADMIN_EMAIL = "nargisnishanargisnisha@gmail.com";
 const CONTACT_PHONE = "+916203544149";
 
+const ALLOWED_ADMIN_UIDS = [
+  "GecuvHCuEHWxi1YtYmTWxoL7Nru2",
+  "SLS2s5Ss3ehQvW2EneVXFJyZbmm2"
+];
+
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
@@ -51,15 +57,17 @@ async function isAdminUser(user) {
   console.log("LOGIN EMAIL:", user.email);
   console.log("LOGIN UID:", user.uid);
 
+  if (!ALLOWED_ADMIN_UIDS.includes(user.uid)) {
+    throw new Error("यह UID अधिकृत Admin सूची में नहीं है: " + user.uid);
+  }
+
   const adminRef = doc(db, "admins", user.uid);
   const adminSnap = await getDoc(adminRef);
 
   console.log("ADMIN DOCUMENT EXISTS:", adminSnap.exists());
 
   if (!adminSnap.exists()) {
-    throw new Error(
-      "UID document नहीं मिला: " + user.uid
-    );
+    throw new Error("admins में UID का डॉक्यूमेंट नहीं मिला: " + user.uid);
   }
 
   const adminData = adminSnap.data();
@@ -70,7 +78,9 @@ async function isAdminUser(user) {
 
   if (adminData.active !== true) {
     throw new Error(
-      "Admin active की value Boolean true नहीं है।"
+      "Firestore में active की असली वैल्यू true नहीं है। मिला: " +
+      JSON.stringify(adminData.active) +
+      " (Type: " + typeof adminData.active + ")"
     );
   }
 
@@ -117,9 +127,7 @@ function go(pageId) {
 }
 
 $$("[data-page]").forEach((button) => {
-  button.addEventListener("click", () => {
-    go(button.dataset.page);
-  });
+  button.addEventListener("click", () => go(button.dataset.page));
 });
 
 $("#menuBtn")?.addEventListener("click", () => {
@@ -203,18 +211,14 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
   } finally {
     if (submitButton) {
       submitButton.disabled = false;
-      submitButton.textContent =
-        originalText || "शिकायत जमा करें";
+      submitButton.textContent = originalText || "शिकायत जमा करें";
     }
   }
 });
 
 // TRACK COMPLAINT
 $("#trackBtn")?.addEventListener("click", async () => {
-  const reportId = ($("#trackId")?.value || "")
-    .trim()
-    .toUpperCase();
-
+  const reportId = ($("#trackId")?.value || "").trim().toUpperCase();
   const output = $("#trackResult");
 
   if (!reportId) {
@@ -225,9 +229,7 @@ $("#trackBtn")?.addEventListener("click", async () => {
   setMessage(output, "शिकायत की स्थिति देखी जा रही है...");
 
   try {
-    const snapshot = await getDoc(
-      doc(db, "tracking", reportId)
-    );
+    const snapshot = await getDoc(doc(db, "tracking", reportId));
 
     if (!snapshot.exists()) {
       setMessage(output, "इस Report ID की शिकायत नहीं मिली।");
@@ -247,8 +249,7 @@ $("#trackBtn")?.addEventListener("click", async () => {
     idLine.textContent = "Report ID: " + item.reportId;
 
     const typeLine = document.createElement("p");
-    typeLine.textContent =
-      "समस्या: " + (item.type || "उपलब्ध नहीं");
+    typeLine.textContent = "समस्या: " + (item.type || "उपलब्ध नहीं");
 
     const statusLabels = {
       Pending: "नई शिकायत",
@@ -271,10 +272,7 @@ $("#trackBtn")?.addEventListener("click", async () => {
 
 // ADMIN LOGIN
 $("#adminLoginBtn")?.addEventListener("click", async () => {
-  const email = ($("#adminEmail")?.value || "")
-    .trim()
-    .toLowerCase();
-
+  const email = ($("#adminEmail")?.value || "").trim().toLowerCase();
   const password = $("#adminPassword")?.value || "";
   const message = $("#adminMsg");
   const button = $("#adminLoginBtn");
@@ -285,7 +283,6 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
   }
 
   if (button) button.disabled = true;
-
   setMessage(message, "लॉगिन हो रहा है...");
 
   try {
@@ -295,11 +292,7 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
       password
     );
 
-    const allowed = await isAdminUser(credential.user);
-
-    if (!allowed) {
-      throw new Error("इस अकाउंट को Admin अनुमति नहीं मिली।");
-    }
+    await isAdminUser(credential.user);
 
     $("#adminLogin")?.classList.add("hidden");
     $("#adminDashboard")?.classList.remove("hidden");
@@ -312,8 +305,7 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 
     setMessage(
       message,
-      "लॉगिन असफल: " +
-      (error.code || "") + " " + error.message
+      "लॉगिन असफल: " + (error.code || "") + " " + error.message
     );
 
     if (auth.currentUser) {
@@ -334,15 +326,11 @@ onAuthStateChanged(auth, async (user) => {
   }
 
   try {
-    const allowed = await isAdminUser(user);
+    await isAdminUser(user);
 
-    if (allowed) {
-      $("#adminLogin")?.classList.add("hidden");
-      $("#adminDashboard")?.classList.remove("hidden");
-      await refreshAdmin();
-    } else {
-      await signOut(auth);
-    }
+    $("#adminLogin")?.classList.add("hidden");
+    $("#adminDashboard")?.classList.remove("hidden");
+    await refreshAdmin();
 
   } catch (error) {
     console.error("Session check failed:", error);
@@ -365,9 +353,11 @@ $("#adminLogoutBtn")?.addEventListener("click", async () => {
 
 // ADMIN DASHBOARD
 async function refreshAdmin() {
-  if (!(await isAdminUser(auth.currentUser))) return;
+  if (!auth.currentUser) return;
 
   try {
+    await isAdminUser(auth.currentUser);
+
     const complaintsQuery = query(
       collection(db, "complaints"),
       orderBy("createdAt", "desc")
@@ -493,4 +483,3 @@ window.JALMITRA_CONTACT = {
   email: ADMIN_EMAIL,
   phone: CONTACT_PHONE
 };
-                                      
