@@ -5,9 +5,14 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <meta name="theme-color" content="#06458f">
   <meta name="description" content="JALMITRA 360 - जल संरक्षण और पानी से जुड़ी शिकायतों का नागरिक मंच">
+
   <title>JALMITRA 360</title>
-  <link rel="manifest" href="manifest.webmanifest">
-  <link rel="stylesheet" href="style.css">
+
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="icon" type="image/png" sizes="192x192" href="./jalmitra-icon-192.png">
+  <link rel="apple-touch-icon" href="./jalmitra-icon-192.png">
+  <link rel="stylesheet" href="./style.css">
+
 </head>
 <body>
   <div class="app-shell">
@@ -217,7 +222,7 @@
         <div class="panel">
           <h2>JALMITRA 360 सहायता</h2>
           <p>ईमेल:</p>
-          <p><a href="mailto:nargisnishanargisnisha@gmail.com">nargisnishanargisnisha@gmail.com</a></p>
+          <p><a href="mailto:nargisnishanargisnisha@gmail.com">nargisnishanargis@gmail.com</a></p>
           <p>संपर्क नंबर:</p>
           <p><a href="tel:+916203544149">+91 6203544149</a></p>
         </div>
@@ -234,6 +239,17 @@
 
   </div>
 
-  <script type="module" src="app.js?v=2"></script>
+  <script type="module" src="./app.js?v=2"></script>
+
+  <script>
+    if ("serviceWorker" in navigator) {
+      window.addEventListener("load", () => {
+        navigator.serviceWorker.register("./sw.js")
+          .then(() => console.log("JALMITRA 360 App Ready"))
+          .catch((error) => console.error("Service Worker Error:", error));
+      });
+    }
+  </script>
+
 </body>
 </html>
