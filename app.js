@@ -19,7 +19,7 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 
-// JALMITRA 360 Firebase Configuration
+// Firebase Configuration
 const firebaseConfig = {
   apiKey: "AIzaSyDCqrxb4NVNZ5rP2AGNb6biUTw0Xns9Ax8",
   authDomain: "jalmitra-360.firebaseapp.com",
@@ -40,20 +40,19 @@ const auth = getAuth(firebaseApp);
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
 
+function setMessage(element, message) {
+  if (element) element.textContent = message;
+}
+
 // Dynamic Admin Verification
 async function isAdminUser(user) {
   if (!user) return false;
 
-  try {
-    const adminRef = doc(db, "admins", user.uid);
-    const adminSnap = await getDoc(adminRef);
+  const adminRef = doc(db, "admins", user.uid);
+  const adminSnap = await getDoc(adminRef);
 
-    return adminSnap.exists() &&
-      adminSnap.data().active === true;
-  } catch (error) {
-    console.error("Admin verification failed:", error);
-    return false;
-  }
+  return adminSnap.exists() &&
+    adminSnap.data().active === true;
 }
 
 // Indian States
@@ -130,10 +129,6 @@ function makeReportId() {
   return `JM360-${datePart}-${randomPart}`;
 }
 
-function setMessage(element, message) {
-  if (element) element.textContent = message;
-}
-
 // Submit Complaint
 $("#complaintForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -183,8 +178,7 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
     console.error("Complaint submission failed:", error);
 
     alert(
-      "शिकायत जमा नहीं हो सकी। इंटरनेट और Firebase सेटिंग जाँचें। विवरण: " +
-      error.message
+      "शिकायत जमा नहीं हो सकी। विवरण: " + error.message
     );
 
   } finally {
@@ -255,7 +249,7 @@ $("#trackBtn")?.addEventListener("click", async () => {
 
     setMessage(
       output,
-      "ट्रैकिंग उपलब्ध नहीं है। कृपया बाद में कोशिश करें।"
+      "ट्रैकिंग उपलब्ध नहीं है: " + error.message
     );
   }
 });
@@ -290,7 +284,9 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 
     if (!allowed) {
       await signOut(auth);
-      throw new Error("यह अकाउंट अधिकृत Admin नहीं है।");
+      throw new Error(
+        "इस UID को admins collection में अनुमति नहीं मिली।"
+      );
     }
 
     $("#adminLogin")?.classList.add("hidden");
@@ -304,8 +300,13 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 
     setMessage(
       message,
-      "लॉगिन असफल। ईमेल, पासवर्ड और Admin अनुमति जाँचें।"
+      "लॉगिन असफल: " +
+      (error.code || "") + " " + error.message
     );
+
+    if (auth.currentUser) {
+      await signOut(auth).catch(console.error);
+    }
 
   } finally {
     if (button) button.disabled = false;
@@ -314,19 +315,26 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 
 // Restore Admin Session
 onAuthStateChanged(auth, async (user) => {
-  const allowed = await isAdminUser(user);
+  try {
+    const allowed = await isAdminUser(user);
 
-  if (allowed) {
-    $("#adminLogin")?.classList.add("hidden");
-    $("#adminDashboard")?.classList.remove("hidden");
-    await refreshAdmin();
-  } else {
+    if (allowed) {
+      $("#adminLogin")?.classList.add("hidden");
+      $("#adminDashboard")?.classList.remove("hidden");
+      await refreshAdmin();
+    } else {
+      $("#adminLogin")?.classList.remove("hidden");
+      $("#adminDashboard")?.classList.add("hidden");
+
+      if (user) {
+        await signOut(auth);
+      }
+    }
+  } catch (error) {
+    console.error("Session check failed:", error);
+
     $("#adminLogin")?.classList.remove("hidden");
     $("#adminDashboard")?.classList.add("hidden");
-
-    if (user) {
-      await signOut(auth);
-    }
   }
 });
 
@@ -446,7 +454,7 @@ async function refreshAdmin() {
           console.error("Status update failed:", error);
 
           alert(
-            "स्थिति अपडेट नहीं हुई। कृपया दोबारा कोशिश करें।"
+            "स्थिति अपडेट नहीं हुई: " + error.message
           );
 
           select.disabled = false;
@@ -462,7 +470,7 @@ async function refreshAdmin() {
 
     setMessage(
       $("#adminList"),
-      "शिकायतें लोड नहीं हुईं। Firestore Rules और इंटरनेट जाँचें।"
+      "शिकायतें लोड नहीं हुईं: " + error.message
     );
   }
 }
@@ -492,4 +500,4 @@ window.JALMITRA_CONTACT = {
   email: ADMIN_EMAIL,
   phone: CONTACT_PHONE
 };
-  
+    
