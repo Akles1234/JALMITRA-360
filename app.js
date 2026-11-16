@@ -1,14 +1,405 @@
-const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
-const states=['आंध्र प्रदेश','अरुणाचल प्रदेश','असम','बिहार','छत्तीसगढ़','गोवा','गुजरात','हरियाणा','हिमाचल प्रदेश','झारखंड','कर्नाटक','केरल','मध्य प्रदेश','महाराष्ट्र','मणिपुर','मेघालय','मिजोरम','नागालैंड','ओडिशा','पंजाब','राजस्थान','सिक्किम','तमिलनाडु','तेलंगाना','त्रिपुरा','उत्तर प्रदेश','उत्तराखंड','पश्चिम बंगाल','अंडमान और निकोबार द्वीपसमूह','चंडीगढ़','दादरा और नगर हवेली और दमन और दीव','दिल्ली','जम्मू और कश्मीर','लद्दाख','लक्षद्वीप','पुदुचेरी'];
-states.forEach(s=>$('#state').add(new Option(s,s)));
-const read=()=>JSON.parse(localStorage.getItem('jm360_complaints')||'[]');
-const save=a=>localStorage.setItem('jm360_complaints',JSON.stringify(a));
-function go(id){$$('.page').forEach(p=>p.classList.toggle('active',p.id===id));$$('[data-page]').forEach(b=>b.classList.toggle('selected',b.dataset.page===id));$('#drawer').classList.add('hidden');window.scrollTo(0,0);if(id==='admin')refreshAdmin();if(id==='stats')$('#statsText').textContent=`अब तक ${read().length} डेमो शिकायतें इस डिवाइस में दर्ज हैं।`}
-$$('[data-page]').forEach(b=>b.addEventListener('click',()=>go(b.dataset.page)));
-$('#menuBtn').onclick=()=>$('#drawer').classList.toggle('hidden');
-$('#notificationBtn').onclick=$('#bottomNotice').onclick=()=>alert('अभी कोई नई सूचना नहीं है।');
-function makeId(){let d=new Date(),date=d.getFullYear()+String(d.getMonth()+1).padStart(2,'0')+String(d.getDate()).padStart(2,'0');let n=read().length+1;return `JM360-${date}-${String(n).padStart(3,'0')}`}
-$('#complaintForm').addEventListener('submit',async e=>{e.preventDefault();let f=e.currentTarget,fd=new FormData(f),photo=f.photo.files[0];let item=Object.fromEntries(fd.entries());item.reportId=makeId();item.status='Pending';item.createdAt=new Date().toISOString();item.photoName=photo?.name||'';let all=read();all.push(item);save(all);$('#successId').textContent=item.reportId;$('#noticeCount').textContent=all.length;f.reset();go('success')});
-$('#trackBtn').onclick=()=>{let id=$('#trackId').value.trim().toUpperCase(),item=read().find(x=>x.reportId===id),out=$('#trackResult');out.innerHTML='';if(!item){out.innerHTML='<p class="empty">इस Report ID की शिकायत इस डिवाइस में नहीं मिली।</p>';return}let d=document.createElement('div');d.className='result';d.innerHTML=`<b>✅ शिकायत प्राप्त हो चुकी है</b><p>Report ID: ${item.reportId}</p><p>दिनांक: ${new Date(item.createdAt).toLocaleString('hi-IN')}</p><p>स्थान: ${item.place}, ${item.district}, ${item.state}</p><p>समस्या: ${item.type}</p><p>स्थिति: <span class="status">${item.status}</span></p>`;out.append(d)};
-$('#adminLoginBtn').onclick=()=>{if(!$('#adminEmail').value||!$('#adminPassword').value){$('#adminMsg').textContent='डेमो देखने के लिए कोई ईमेल और पासवर्ड भरें।';return}$('#adminLogin').classList.add('hidden');$('#adminDashboard').classList.remove('hidden');refreshAdmin()};
-function refreshAdmin(){let a=read();$('#totalCount').textContent=a.length;$('#newCount').textContent=a.filter(x=>x.status==='Pending').length;$('#pendingCount').textContent=a.filter(x=>x.status==='In Review').length;$('#doneCount').textContent=a.filter(x=>x.status==='Resolved').length;let list=$('#adminList');list.innerHTML='';if(!a.length){list.innerHTML='<p class="empty">अभी कोई शिकायत नहीं है।</p>';return}a.slice().reverse().forEach(item=>{let row=document.createElement('div');row.className='complaint-row';let title=document.createElement('b');title.textContent=item.reportId+' · '+item.type;let detail=document.createElement('p');detail.textContent=item.place+', '+item.district+' ('+item.state+')';let sel=document.createElement('select');['Pending','In Review','Resolved'].forEach(s=>sel.add(new Option(s,s)));sel.value=item.status;sel.onchange=()=>{let all=read(),x=all.find(y=>y.reportId===item.reportId);x.status=sel.value;save(all);refreshAdmin()};row.append(title,detail,sel);list.append(row)})}
+import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
+import {
+  getFirestore, doc, getDoc, getDocs, collection, query,
+  orderBy, writeBatch, serverTimestamp
+} from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
+import {
+  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
+
+// JALMITRA 360 Firebase Configuration
+const firebaseConfig = {
+  apiKey: "AIzaSyDCqrxb4NVNZ5rP2AGNb6biUTw0Xns9Ax8",
+  authDomain: "jalmitra-360.firebaseapp.com",
+  projectId: "jalmitra-360",
+  storageBucket: "jalmitra-360.firebasestorage.app",
+  messagingSenderId: "217827320498",
+  appId: "1:217827320498:web:f2b306dac416ce8ac81fab",
+  measurementId: "G-YBDK6Q5VKY"
+};
+
+const ADMIN_UID = "GecuvHCuEHWxi1YtYmTWxoL7Nru2";
+const ADMIN_EMAIL = "nargisnishanargisnisha@gmail.com";
+const CONTACT_PHONE = "+916203544149";
+
+const firebaseApp = initializeApp(firebaseConfig);
+const db = getFirestore(firebaseApp);
+const auth = getAuth(firebaseApp);
+
+const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+const states = [
+  "आंध्र प्रदेश", "अरुणाचल प्रदेश", "असम", "बिहार", "छत्तीसगढ़",
+  "गोवा", "गुजरात", "हरियाणा", "हिमाचल प्रदेश", "झारखंड",
+  "कर्नाटक", "केरल", "मध्य प्रदेश", "महाराष्ट्र", "मणिपुर",
+  "मेघालय", "मिजोरम", "नागालैंड", "ओडिशा", "पंजाब",
+  "राजस्थान", "सिक्किम", "तमिलनाडु", "तेलंगाना", "त्रिपुरा",
+  "उत्तर प्रदेश", "उत्तराखंड", "पश्चिम बंगाल",
+  "अंडमान और निकोबार द्वीपसमूह", "चंडीगढ़",
+  "दादरा और नगर हवेली और दमन और दीव", "दिल्ली",
+  "जम्मू और कश्मीर", "लद्दाख", "लक्षद्वीप", "पुदुचेरी"
+];
+
+if ($("#state")) {
+  states.forEach((state) => $("#state").add(new Option(state, state)));
+}
+
+// Navigation
+function go(pageId) {
+  $$(".page").forEach((page) => {
+    page.classList.toggle("active", page.id === pageId);
+  });
+
+  $$("[data-page]").forEach((button) => {
+    button.classList.toggle("selected", button.dataset.page === pageId);
+  });
+
+  $("#drawer")?.classList.add("hidden");
+  window.scrollTo({ top: 0, behavior: "smooth" });
+
+  if (pageId === "admin") refreshAdmin();
+  if (pageId === "stats") refreshStats();
+}
+
+$$("[data-page]").forEach((button) => {
+  button.addEventListener("click", () => go(button.dataset.page));
+});
+
+$("#menuBtn")?.addEventListener("click", () => {
+  $("#drawer")?.classList.toggle("hidden");
+});
+
+function showNotice() {
+  alert("नई सूचनाएँ अभी उपलब्ध नहीं हैं।");
+}
+
+$("#notificationBtn")?.addEventListener("click", showNotice);
+$("#bottomNotice")?.addEventListener("click", showNotice);
+
+// Generate unique complaint ID
+function makeReportId() {
+  const date = new Date();
+
+  const datePart = [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, "0"),
+    String(date.getDate()).padStart(2, "0")
+  ].join("");
+
+  const randomPart = crypto.randomUUID()
+    .replaceAll("-", "")
+    .slice(0, 8)
+    .toUpperCase();
+
+  return `JM360-${datePart}-${randomPart}`;
+}
+
+function setMessage(element, message) {
+  if (element) element.textContent = message;
+}
+
+// Submit complaint
+$("#complaintForm")?.addEventListener("submit", async (event) => {
+  event.preventDefault();
+
+  const form = event.currentTarget;
+  const submitButton = form.querySelector('[type="submit"]');
+  const originalText = submitButton?.textContent;
+
+  if (submitButton) {
+    submitButton.disabled = true;
+    submitButton.textContent = "शिकायत जमा हो रही है...";
+  }
+
+  try {
+    const formData = new FormData(form);
+    const complaintData = Object.fromEntries(formData.entries());
+
+    // Photo upload is not enabled in this version
+    delete complaintData.photo;
+
+    const reportId = makeReportId();
+    const batch = writeBatch(db);
+
+    batch.set(doc(db, "complaints", reportId), {
+      ...complaintData,
+      reportId,
+      status: "Pending",
+      createdAt: serverTimestamp()
+    });
+
+    batch.set(doc(db, "tracking", reportId), {
+      reportId,
+      status: "Pending",
+      type: complaintData.type,
+      createdAt: serverTimestamp()
+    });
+
+    await batch.commit();
+
+    if ($("#successId")) {
+      $("#successId").textContent = reportId;
+    }
+
+    form.reset();
+    go("success");
+
+  } catch (error) {
+    console.error("Complaint submission failed:", error);
+    alert(
+      "शिकायत जमा नहीं हो सकी। इंटरनेट और Firebase सेटिंग जाँचें। विवरण: " +
+      error.message
+    );
+  } finally {
+    if (submitButton) {
+      submitButton.disabled = false;
+      submitButton.textContent = originalText || "शिकायत जमा करें";
+    }
+  }
+});
+
+// Track complaint
+$("#trackBtn")?.addEventListener("click", async () => {
+  const reportId = ($("#trackId")?.value || "").trim().toUpperCase();
+  const output = $("#trackResult");
+
+  if (!reportId) {
+    setMessage(output, "कृपया Report ID दर्ज करें।");
+    return;
+  }
+
+  setMessage(output, "शिकायत की स्थिति देखी जा रही है...");
+
+  try {
+    const snapshot = await getDoc(doc(db, "tracking", reportId));
+
+    if (!snapshot.exists()) {
+      setMessage(output, "इस Report ID की शिकायत नहीं मिली।");
+      return;
+    }
+
+    const item = snapshot.data();
+    output.replaceChildren();
+
+    const result = document.createElement("div");
+    result.className = "result";
+
+    const heading = document.createElement("b");
+    heading.textContent = "शिकायत की स्थिति";
+
+    const idLine = document.createElement("p");
+    idLine.textContent = "Report ID: " + item.reportId;
+
+    const typeLine = document.createElement("p");
+    typeLine.textContent = "समस्या: " + (item.type || "उपलब्ध नहीं");
+
+    const statusLine = document.createElement("p");
+
+    const statusLabels = {
+      Pending: "नई शिकायत",
+      "In Review": "जांच जारी",
+      Resolved: "समाधान हो गया"
+    };
+
+    statusLine.textContent =
+      "स्थिति: " + (statusLabels[item.status] || item.status);
+
+    result.append(heading, idLine, typeLine, statusLine);
+    output.append(result);
+
+  } catch (error) {
+    console.error("Tracking failed:", error);
+    setMessage(output, "ट्रैकिंग उपलब्ध नहीं है। कृपया बाद में कोशिश करें।");
+  }
+});
+
+// Admin Login
+$("#adminLoginBtn")?.addEventListener("click", async () => {
+  const email = ($("#adminEmail")?.value || "").trim().toLowerCase();
+  const password = $("#adminPassword")?.value || "";
+  const message = $("#adminMsg");
+  const button = $("#adminLoginBtn");
+
+  if (email !== ADMIN_EMAIL.toLowerCase()) {
+    setMessage(message, "यह Admin Email सही नहीं है।");
+    return;
+  }
+
+  if (!password) {
+    setMessage(message, "कृपया पासवर्ड दर्ज करें।");
+    return;
+  }
+
+  if (button) button.disabled = true;
+  setMessage(message, "लॉगिन हो रहा है...");
+
+  try {
+    const credential = await signInWithEmailAndPassword(
+      auth,
+      email,
+      password
+    );
+
+    if (credential.user.uid !== ADMIN_UID) {
+      await signOut(auth);
+      throw new Error("यह अकाउंट अधिकृत Admin नहीं है।");
+    }
+
+    $("#adminLogin")?.classList.add("hidden");
+    $("#adminDashboard")?.classList.remove("hidden");
+
+    setMessage(message, "");
+    await refreshAdmin();
+
+  } catch (error) {
+    console.error("Admin login failed:", error);
+    setMessage(message, "लॉगिन असफल। ईमेल और पासवर्ड जाँचें।");
+  } finally {
+    if (button) button.disabled = false;
+  }
+});
+
+// Restore admin session
+onAuthStateChanged(auth, async (user) => {
+  if (user && user.uid === ADMIN_UID) {
+    $("#adminLogin")?.classList.add("hidden");
+    $("#adminDashboard")?.classList.remove("hidden");
+    await refreshAdmin();
+  } else {
+    $("#adminLogin")?.classList.remove("hidden");
+    $("#adminDashboard")?.classList.add("hidden");
+  }
+});
+
+// Admin complaint dashboard
+async function refreshAdmin() {
+  if (!auth.currentUser || auth.currentUser.uid !== ADMIN_UID) return;
+
+  try {
+    const complaintsQuery = query(
+      collection(db, "complaints"),
+      orderBy("createdAt", "desc")
+    );
+
+    const snapshot = await getDocs(complaintsQuery);
+    const complaints = snapshot.docs.map((item) => item.data());
+
+    if ($("#totalCount")) {
+      $("#totalCount").textContent = complaints.length;
+    }
+
+    if ($("#newCount")) {
+      $("#newCount").textContent =
+        complaints.filter((item) => item.status === "Pending").length;
+    }
+
+    if ($("#pendingCount")) {
+      $("#pendingCount").textContent =
+        complaints.filter((item) => item.status === "In Review").length;
+    }
+
+    if ($("#doneCount")) {
+      $("#doneCount").textContent =
+        complaints.filter((item) => item.status === "Resolved").length;
+    }
+
+    const list = $("#adminList");
+    if (!list) return;
+
+    list.replaceChildren();
+
+    if (!complaints.length) {
+      const empty = document.createElement("p");
+      empty.className = "empty";
+      empty.textContent = "अभी कोई शिकायत नहीं है।";
+      list.append(empty);
+      return;
+    }
+
+    complaints.forEach((item) => {
+      const row = document.createElement("div");
+      row.className = "complaint-row";
+
+      const title = document.createElement("b");
+      title.textContent = `${item.reportId} · ${item.type}`;
+
+      const detail = document.createElement("p");
+      detail.textContent =
+        `${item.name} · ${item.phone} · ${item.place}, ${item.district}, ${item.state}`;
+
+      const description = document.createElement("p");
+      description.textContent = item.details || "";
+
+      const select = document.createElement("select");
+
+      [
+        ["Pending", "नई"],
+        ["In Review", "जांच जारी"],
+        ["Resolved", "समाधान हो गया"]
+      ].forEach(([value, label]) => {
+        select.add(new Option(label, value));
+      });
+
+      select.value = item.status || "Pending";
+
+      select.addEventListener("change", async () => {
+        const newStatus = select.value;
+        select.disabled = true;
+
+        try {
+          const batch = writeBatch(db);
+
+          batch.update(
+            doc(db, "complaints", item.reportId),
+            { status: newStatus }
+          );
+
+          batch.update(
+            doc(db, "tracking", item.reportId),
+            { status: newStatus }
+          );
+
+          await batch.commit();
+          await refreshAdmin();
+
+        } catch (error) {
+          console.error("Status update failed:", error);
+          alert("स्थिति अपडेट नहीं हुई। कृपया दोबारा कोशिश करें।");
+          select.disabled = false;
+        }
+      });
+
+      row.append(title, detail, description, select);
+      list.append(row);
+    });
+
+  } catch (error) {
+    console.error("Admin list failed:", error);
+    setMessage(
+      $("#adminList"),
+      "शिकायतें लोड नहीं हुईं। Firestore Rules और इंटरनेट जाँचें।"
+    );
+  }
+}
+
+// Complaint statistics
+async function refreshStats() {
+  const statsText = $("#statsText");
+  if (!statsText) return;
+
+  try {
+    const snapshot = await getDocs(collection(db, "tracking"));
+    statsText.textContent =
+      `अब तक ${snapshot.size} शिकायतें दर्ज हुई हैं।`;
+  } catch (error) {
+    statsText.textContent = "आंकड़े अभी उपलब्ध नहीं हैं।";
+  }
+}
+
+// Contact information
+window.JALMITRA_CONTACT = {
+  email: ADMIN_EMAIL,
+  phone: CONTACT_PHONE
+};
+                 
