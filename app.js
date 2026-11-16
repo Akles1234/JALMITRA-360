@@ -19,7 +19,7 @@ import {
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 
-// Firebase Configuration
+// FIREBASE CONFIGURATION
 const firebaseConfig = {
   apiKey: "AIzaSyDCqrxb4NVNZ5rP2AGNb6biUTw0Xns9Ax8",
   authDomain: "jalmitra-360.firebaseapp.com",
@@ -44,18 +44,40 @@ function setMessage(element, message) {
   if (element) element.textContent = message;
 }
 
-// Dynamic Admin Verification
+// ADMIN VERIFICATION
 async function isAdminUser(user) {
   if (!user) return false;
+
+  console.log("LOGIN EMAIL:", user.email);
+  console.log("LOGIN UID:", user.uid);
 
   const adminRef = doc(db, "admins", user.uid);
   const adminSnap = await getDoc(adminRef);
 
-  return adminSnap.exists() &&
-    adminSnap.data().active === true;
+  console.log("ADMIN DOCUMENT EXISTS:", adminSnap.exists());
+
+  if (!adminSnap.exists()) {
+    throw new Error(
+      "UID document नहीं मिला: " + user.uid
+    );
+  }
+
+  const adminData = adminSnap.data();
+
+  console.log("ADMIN DATA:", adminData);
+  console.log("ACTIVE VALUE:", adminData.active);
+  console.log("ACTIVE TYPE:", typeof adminData.active);
+
+  if (adminData.active !== true) {
+    throw new Error(
+      "Admin active की value Boolean true नहीं है।"
+    );
+  }
+
+  return true;
 }
 
-// Indian States
+// INDIAN STATES
 const states = [
   "आंध्र प्रदेश", "अरुणाचल प्रदेश", "असम", "बिहार", "छत्तीसगढ़",
   "गोवा", "गुजरात", "हरियाणा", "हिमाचल प्रदेश", "झारखंड",
@@ -74,7 +96,7 @@ if ($("#state")) {
   });
 }
 
-// Navigation
+// NAVIGATION
 function go(pageId) {
   $$(".page").forEach((page) => {
     page.classList.toggle("active", page.id === pageId);
@@ -111,7 +133,7 @@ function showNotice() {
 $("#notificationBtn")?.addEventListener("click", showNotice);
 $("#bottomNotice")?.addEventListener("click", showNotice);
 
-// Generate Unique Complaint ID
+// GENERATE REPORT ID
 function makeReportId() {
   const date = new Date();
 
@@ -129,7 +151,7 @@ function makeReportId() {
   return `JM360-${datePart}-${randomPart}`;
 }
 
-// Submit Complaint
+// SUBMIT COMPLAINT
 $("#complaintForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -176,10 +198,7 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
 
   } catch (error) {
     console.error("Complaint submission failed:", error);
-
-    alert(
-      "शिकायत जमा नहीं हो सकी। विवरण: " + error.message
-    );
+    alert("शिकायत जमा नहीं हो सकी: " + error.message);
 
   } finally {
     if (submitButton) {
@@ -190,7 +209,7 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
   }
 });
 
-// Track Complaint
+// TRACK COMPLAINT
 $("#trackBtn")?.addEventListener("click", async () => {
   const reportId = ($("#trackId")?.value || "")
     .trim()
@@ -246,15 +265,11 @@ $("#trackBtn")?.addEventListener("click", async () => {
 
   } catch (error) {
     console.error("Tracking failed:", error);
-
-    setMessage(
-      output,
-      "ट्रैकिंग उपलब्ध नहीं है: " + error.message
-    );
+    setMessage(output, "ट्रैकिंग उपलब्ध नहीं है: " + error.message);
   }
 });
 
-// Admin Login
+// ADMIN LOGIN
 $("#adminLoginBtn")?.addEventListener("click", async () => {
   const email = ($("#adminEmail")?.value || "")
     .trim()
@@ -283,10 +298,7 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
     const allowed = await isAdminUser(credential.user);
 
     if (!allowed) {
-      await signOut(auth);
-      throw new Error(
-        "इस UID को admins collection में अनुमति नहीं मिली।"
-      );
+      throw new Error("इस अकाउंट को Admin अनुमति नहीं मिली।");
     }
 
     $("#adminLogin")?.classList.add("hidden");
@@ -313,8 +325,14 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
   }
 });
 
-// Restore Admin Session
+// RESTORE ADMIN SESSION
 onAuthStateChanged(auth, async (user) => {
+  if (!user) {
+    $("#adminLogin")?.classList.remove("hidden");
+    $("#adminDashboard")?.classList.add("hidden");
+    return;
+  }
+
   try {
     const allowed = await isAdminUser(user);
 
@@ -323,22 +341,18 @@ onAuthStateChanged(auth, async (user) => {
       $("#adminDashboard")?.classList.remove("hidden");
       await refreshAdmin();
     } else {
-      $("#adminLogin")?.classList.remove("hidden");
-      $("#adminDashboard")?.classList.add("hidden");
-
-      if (user) {
-        await signOut(auth);
-      }
+      await signOut(auth);
     }
+
   } catch (error) {
     console.error("Session check failed:", error);
-
     $("#adminLogin")?.classList.remove("hidden");
     $("#adminDashboard")?.classList.add("hidden");
+    await signOut(auth).catch(console.error);
   }
 });
 
-// Admin Logout
+// ADMIN LOGOUT
 $("#adminLogoutBtn")?.addEventListener("click", async () => {
   try {
     await signOut(auth);
@@ -349,7 +363,7 @@ $("#adminLogoutBtn")?.addEventListener("click", async () => {
   }
 });
 
-// Admin Complaint Dashboard
+// ADMIN DASHBOARD
 async function refreshAdmin() {
   if (!(await isAdminUser(auth.currentUser))) return;
 
@@ -360,10 +374,7 @@ async function refreshAdmin() {
     );
 
     const snapshot = await getDocs(complaintsQuery);
-
-    const complaints = snapshot.docs.map(
-      (item) => item.data()
-    );
+    const complaints = snapshot.docs.map((item) => item.data());
 
     if ($("#totalCount")) {
       $("#totalCount").textContent = complaints.length;
@@ -371,23 +382,17 @@ async function refreshAdmin() {
 
     if ($("#newCount")) {
       $("#newCount").textContent =
-        complaints.filter(
-          (item) => item.status === "Pending"
-        ).length;
+        complaints.filter((item) => item.status === "Pending").length;
     }
 
     if ($("#pendingCount")) {
       $("#pendingCount").textContent =
-        complaints.filter(
-          (item) => item.status === "In Review"
-        ).length;
+        complaints.filter((item) => item.status === "In Review").length;
     }
 
     if ($("#doneCount")) {
       $("#doneCount").textContent =
-        complaints.filter(
-          (item) => item.status === "Resolved"
-        ).length;
+        complaints.filter((item) => item.status === "Resolved").length;
     }
 
     const list = $("#adminList");
@@ -408,8 +413,7 @@ async function refreshAdmin() {
       row.className = "complaint-row";
 
       const title = document.createElement("b");
-      title.textContent =
-        `${item.reportId} · ${item.type}`;
+      title.textContent = `${item.reportId} · ${item.type}`;
 
       const detail = document.createElement("p");
       detail.textContent =
@@ -452,11 +456,7 @@ async function refreshAdmin() {
 
         } catch (error) {
           console.error("Status update failed:", error);
-
-          alert(
-            "स्थिति अपडेट नहीं हुई: " + error.message
-          );
-
+          alert("स्थिति अपडेट नहीं हुई: " + error.message);
           select.disabled = false;
         }
       });
@@ -467,37 +467,30 @@ async function refreshAdmin() {
 
   } catch (error) {
     console.error("Admin list failed:", error);
-
-    setMessage(
-      $("#adminList"),
-      "शिकायतें लोड नहीं हुईं: " + error.message
-    );
+    setMessage($("#adminList"), "शिकायतें लोड नहीं हुईं: " + error.message);
   }
 }
 
-// Complaint Statistics
+// COMPLAINT STATISTICS
 async function refreshStats() {
   const statsText = $("#statsText");
   if (!statsText) return;
 
   try {
-    const snapshot = await getDocs(
-      collection(db, "tracking")
-    );
+    const snapshot = await getDocs(collection(db, "tracking"));
 
     statsText.textContent =
       `अब तक ${snapshot.size} शिकायतें दर्ज हुई हैं।`;
 
   } catch (error) {
     console.error("Stats failed:", error);
-    statsText.textContent =
-      "आंकड़े अभी उपलब्ध नहीं हैं।";
+    statsText.textContent = "आंकड़े अभी उपलब्ध नहीं हैं।";
   }
 }
 
-// Contact Information
+// CONTACT INFORMATION
 window.JALMITRA_CONTACT = {
   email: ADMIN_EMAIL,
   phone: CONTACT_PHONE
 };
-    
+                                      
