@@ -1,8 +1,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
+
 import {
   getFirestore, doc, getDoc, getDocs, collection, query,
   orderBy, writeBatch, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
+
 import {
   getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
@@ -18,7 +20,6 @@ const firebaseConfig = {
   measurementId: "G-YBDK6Q5VKY"
 };
 
-const ADMIN_UID = "GecuvHCuEHWxi1YtYmTWxoL7Nru2";
 const ADMIN_EMAIL = "nargisnishanargisnisha@gmail.com";
 const CONTACT_PHONE = "+916203544149";
 
@@ -28,6 +29,22 @@ const auth = getAuth(firebaseApp);
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
+
+// Dynamic Admin Verification
+async function isAdminUser(user) {
+  if (!user) return false;
+
+  try {
+    const adminRef = doc(db, "admins", user.uid);
+    const adminSnap = await getDoc(adminRef);
+
+    return adminSnap.exists() &&
+      adminSnap.data().active === true;
+  } catch (error) {
+    console.error("Admin verification failed:", error);
+    return false;
+  }
+}
 
 const states = [
   "आंध्र प्रदेश", "अरुणाचल प्रदेश", "असम", "बिहार", "छत्तीसगढ़",
@@ -116,7 +133,6 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
     const formData = new FormData(form);
     const complaintData = Object.fromEntries(formData.entries());
 
-    // Photo upload is not enabled in this version
     delete complaintData.photo;
 
     const reportId = makeReportId();
@@ -221,13 +237,8 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
   const message = $("#adminMsg");
   const button = $("#adminLoginBtn");
 
-  if (email !== ADMIN_EMAIL.toLowerCase()) {
-    setMessage(message, "यह Admin Email सही नहीं है।");
-    return;
-  }
-
-  if (!password) {
-    setMessage(message, "कृपया पासवर्ड दर्ज करें।");
+  if (!email || !password) {
+    setMessage(message, "कृपया ईमेल और पासवर्ड दर्ज करें।");
     return;
   }
 
@@ -241,7 +252,7 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
       password
     );
 
-    if (credential.user.uid !== ADMIN_UID) {
+    if (!(await isAdminUser(credential.user))) {
       await signOut(auth);
       throw new Error("यह अकाउंट अधिकृत Admin नहीं है।");
     }
@@ -254,15 +265,17 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 
   } catch (error) {
     console.error("Admin login failed:", error);
-    setMessage(message, "लॉगिन असफल। ईमेल और पासवर्ड जाँचें।");
+    setMessage(message, "लॉगिन असफल। ईमेल, पासवर्ड और Admin अनुमति जाँचें।");
   } finally {
     if (button) button.disabled = false;
   }
 });
 
-// Restore admin session
+// Restore Admin Session
 onAuthStateChanged(auth, async (user) => {
-  if (user && user.uid === ADMIN_UID) {
+  const allowed = await isAdminUser(user);
+
+  if (allowed) {
     $("#adminLogin")?.classList.add("hidden");
     $("#adminDashboard")?.classList.remove("hidden");
     await refreshAdmin();
@@ -272,9 +285,20 @@ onAuthStateChanged(auth, async (user) => {
   }
 });
 
-// Admin complaint dashboard
+// Admin Logout
+$("#adminLogoutBtn")?.addEventListener("click", async () => {
+  try {
+    await signOut(auth);
+    go("home");
+  } catch (error) {
+    console.error("Logout failed:", error);
+    alert("Logout नहीं हो सका।");
+  }
+});
+
+// Admin Complaint Dashboard
 async function refreshAdmin() {
-  if (!auth.currentUser || auth.currentUser.uid !== ADMIN_UID) return;
+  if (!(await isAdminUser(auth.currentUser))) return;
 
   try {
     const complaintsQuery = query(
@@ -383,7 +407,7 @@ async function refreshAdmin() {
   }
 }
 
-// Complaint statistics
+// Complaint Statistics
 async function refreshStats() {
   const statsText = $("#statsText");
   if (!statsText) return;
@@ -397,9 +421,9 @@ async function refreshStats() {
   }
 }
 
-// Contact information
+// Contact Information
 window.JALMITRA_CONTACT = {
   email: ADMIN_EMAIL,
   phone: CONTACT_PHONE
 };
-                 
+      
