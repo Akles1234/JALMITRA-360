@@ -1,12 +1,22 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
 
 import {
-  getFirestore, doc, getDoc, getDocs, collection, query,
-  orderBy, writeBatch, serverTimestamp
+  getFirestore,
+  doc,
+  getDoc,
+  getDocs,
+  collection,
+  query,
+  orderBy,
+  writeBatch,
+  serverTimestamp
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 
 import {
-  getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged
+  getAuth,
+  signInWithEmailAndPassword,
+  signOut,
+  onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 
 // JALMITRA 360 Firebase Configuration
@@ -46,6 +56,7 @@ async function isAdminUser(user) {
   }
 }
 
+// Indian States
 const states = [
   "आंध्र प्रदेश", "अरुणाचल प्रदेश", "असम", "बिहार", "छत्तीसगढ़",
   "गोवा", "गुजरात", "हरियाणा", "हिमाचल प्रदेश", "झारखंड",
@@ -59,7 +70,9 @@ const states = [
 ];
 
 if ($("#state")) {
-  states.forEach((state) => $("#state").add(new Option(state, state)));
+  states.forEach((state) => {
+    $("#state").add(new Option(state, state));
+  });
 }
 
 // Navigation
@@ -69,7 +82,10 @@ function go(pageId) {
   });
 
   $$("[data-page]").forEach((button) => {
-    button.classList.toggle("selected", button.dataset.page === pageId);
+    button.classList.toggle(
+      "selected",
+      button.dataset.page === pageId
+    );
   });
 
   $("#drawer")?.classList.add("hidden");
@@ -80,7 +96,9 @@ function go(pageId) {
 }
 
 $$("[data-page]").forEach((button) => {
-  button.addEventListener("click", () => go(button.dataset.page));
+  button.addEventListener("click", () => {
+    go(button.dataset.page);
+  });
 });
 
 $("#menuBtn")?.addEventListener("click", () => {
@@ -94,7 +112,7 @@ function showNotice() {
 $("#notificationBtn")?.addEventListener("click", showNotice);
 $("#bottomNotice")?.addEventListener("click", showNotice);
 
-// Generate unique complaint ID
+// Generate Unique Complaint ID
 function makeReportId() {
   const date = new Date();
 
@@ -116,7 +134,7 @@ function setMessage(element, message) {
   if (element) element.textContent = message;
 }
 
-// Submit complaint
+// Submit Complaint
 $("#complaintForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
 
@@ -163,21 +181,27 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
 
   } catch (error) {
     console.error("Complaint submission failed:", error);
+
     alert(
       "शिकायत जमा नहीं हो सकी। इंटरनेट और Firebase सेटिंग जाँचें। विवरण: " +
       error.message
     );
+
   } finally {
     if (submitButton) {
       submitButton.disabled = false;
-      submitButton.textContent = originalText || "शिकायत जमा करें";
+      submitButton.textContent =
+        originalText || "शिकायत जमा करें";
     }
   }
 });
 
-// Track complaint
+// Track Complaint
 $("#trackBtn")?.addEventListener("click", async () => {
-  const reportId = ($("#trackId")?.value || "").trim().toUpperCase();
+  const reportId = ($("#trackId")?.value || "")
+    .trim()
+    .toUpperCase();
+
   const output = $("#trackResult");
 
   if (!reportId) {
@@ -188,7 +212,9 @@ $("#trackBtn")?.addEventListener("click", async () => {
   setMessage(output, "शिकायत की स्थिति देखी जा रही है...");
 
   try {
-    const snapshot = await getDoc(doc(db, "tracking", reportId));
+    const snapshot = await getDoc(
+      doc(db, "tracking", reportId)
+    );
 
     if (!snapshot.exists()) {
       setMessage(output, "इस Report ID की शिकायत नहीं मिली।");
@@ -208,9 +234,8 @@ $("#trackBtn")?.addEventListener("click", async () => {
     idLine.textContent = "Report ID: " + item.reportId;
 
     const typeLine = document.createElement("p");
-    typeLine.textContent = "समस्या: " + (item.type || "उपलब्ध नहीं");
-
-    const statusLine = document.createElement("p");
+    typeLine.textContent =
+      "समस्या: " + (item.type || "उपलब्ध नहीं");
 
     const statusLabels = {
       Pending: "नई शिकायत",
@@ -218,6 +243,7 @@ $("#trackBtn")?.addEventListener("click", async () => {
       Resolved: "समाधान हो गया"
     };
 
+    const statusLine = document.createElement("p");
     statusLine.textContent =
       "स्थिति: " + (statusLabels[item.status] || item.status);
 
@@ -226,13 +252,20 @@ $("#trackBtn")?.addEventListener("click", async () => {
 
   } catch (error) {
     console.error("Tracking failed:", error);
-    setMessage(output, "ट्रैकिंग उपलब्ध नहीं है। कृपया बाद में कोशिश करें।");
+
+    setMessage(
+      output,
+      "ट्रैकिंग उपलब्ध नहीं है। कृपया बाद में कोशिश करें।"
+    );
   }
 });
 
 // Admin Login
 $("#adminLoginBtn")?.addEventListener("click", async () => {
-  const email = ($("#adminEmail")?.value || "").trim().toLowerCase();
+  const email = ($("#adminEmail")?.value || "")
+    .trim()
+    .toLowerCase();
+
   const password = $("#adminPassword")?.value || "";
   const message = $("#adminMsg");
   const button = $("#adminLoginBtn");
@@ -243,6 +276,7 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
   }
 
   if (button) button.disabled = true;
+
   setMessage(message, "लॉगिन हो रहा है...");
 
   try {
@@ -252,7 +286,9 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
       password
     );
 
-    if (!(await isAdminUser(credential.user))) {
+    const allowed = await isAdminUser(credential.user);
+
+    if (!allowed) {
       await signOut(auth);
       throw new Error("यह अकाउंट अधिकृत Admin नहीं है।");
     }
@@ -265,7 +301,12 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 
   } catch (error) {
     console.error("Admin login failed:", error);
-    setMessage(message, "लॉगिन असफल। ईमेल, पासवर्ड और Admin अनुमति जाँचें।");
+
+    setMessage(
+      message,
+      "लॉगिन असफल। ईमेल, पासवर्ड और Admin अनुमति जाँचें।"
+    );
+
   } finally {
     if (button) button.disabled = false;
   }
@@ -282,6 +323,10 @@ onAuthStateChanged(auth, async (user) => {
   } else {
     $("#adminLogin")?.classList.remove("hidden");
     $("#adminDashboard")?.classList.add("hidden");
+
+    if (user) {
+      await signOut(auth);
+    }
   }
 });
 
@@ -307,7 +352,10 @@ async function refreshAdmin() {
     );
 
     const snapshot = await getDocs(complaintsQuery);
-    const complaints = snapshot.docs.map((item) => item.data());
+
+    const complaints = snapshot.docs.map(
+      (item) => item.data()
+    );
 
     if ($("#totalCount")) {
       $("#totalCount").textContent = complaints.length;
@@ -315,17 +363,23 @@ async function refreshAdmin() {
 
     if ($("#newCount")) {
       $("#newCount").textContent =
-        complaints.filter((item) => item.status === "Pending").length;
+        complaints.filter(
+          (item) => item.status === "Pending"
+        ).length;
     }
 
     if ($("#pendingCount")) {
       $("#pendingCount").textContent =
-        complaints.filter((item) => item.status === "In Review").length;
+        complaints.filter(
+          (item) => item.status === "In Review"
+        ).length;
     }
 
     if ($("#doneCount")) {
       $("#doneCount").textContent =
-        complaints.filter((item) => item.status === "Resolved").length;
+        complaints.filter(
+          (item) => item.status === "Resolved"
+        ).length;
     }
 
     const list = $("#adminList");
@@ -346,7 +400,8 @@ async function refreshAdmin() {
       row.className = "complaint-row";
 
       const title = document.createElement("b");
-      title.textContent = `${item.reportId} · ${item.type}`;
+      title.textContent =
+        `${item.reportId} · ${item.type}`;
 
       const detail = document.createElement("p");
       detail.textContent =
@@ -389,7 +444,11 @@ async function refreshAdmin() {
 
         } catch (error) {
           console.error("Status update failed:", error);
-          alert("स्थिति अपडेट नहीं हुई। कृपया दोबारा कोशिश करें।");
+
+          alert(
+            "स्थिति अपडेट नहीं हुई। कृपया दोबारा कोशिश करें।"
+          );
+
           select.disabled = false;
         }
       });
@@ -400,6 +459,7 @@ async function refreshAdmin() {
 
   } catch (error) {
     console.error("Admin list failed:", error);
+
     setMessage(
       $("#adminList"),
       "शिकायतें लोड नहीं हुईं। Firestore Rules और इंटरनेट जाँचें।"
@@ -413,11 +473,17 @@ async function refreshStats() {
   if (!statsText) return;
 
   try {
-    const snapshot = await getDocs(collection(db, "tracking"));
+    const snapshot = await getDocs(
+      collection(db, "tracking")
+    );
+
     statsText.textContent =
       `अब तक ${snapshot.size} शिकायतें दर्ज हुई हैं।`;
+
   } catch (error) {
-    statsText.textContent = "आंकड़े अभी उपलब्ध नहीं हैं।";
+    console.error("Stats failed:", error);
+    statsText.textContent =
+      "आंकड़े अभी उपलब्ध नहीं हैं।";
   }
 }
 
@@ -426,4 +492,4 @@ window.JALMITRA_CONTACT = {
   email: ADMIN_EMAIL,
   phone: CONTACT_PHONE
 };
-      
+  
