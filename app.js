@@ -63,7 +63,7 @@ async function isAdminUser(user) {
   if (!user || user.isAnonymous) return false;
 
   if (!ALLOWED_ADMIN_UIDS.includes(user.uid)) {
-    throw new Error("यह UID अधिकृत Admin सूची में नहीं है: " + user.uid);
+    throw new Error("यह UID अधिकृत Admin सूची में नहीं है।");
   }
 
   const adminRef = doc(db, "admins", user.uid);
@@ -73,9 +73,7 @@ async function isAdminUser(user) {
     throw new Error("Admin का Firestore डॉक्यूमेंट नहीं मिला।");
   }
 
-  const adminData = adminSnap.data();
-
-  if (adminData.active !== true) {
+  if (adminSnap.data().active !== true) {
     throw new Error("Admin account सक्रिय नहीं है।");
   }
 
@@ -126,8 +124,40 @@ $("#menuBtn")?.addEventListener("click", () => {
   $("#drawer")?.classList.toggle("hidden");
 });
 
+// NOTIFICATION CENTER
+const notifications = [
+  {
+    title: "स्वागत संदेश",
+    message: "JALMITRA 360 में आपका हार्दिक स्वागत है।"
+  },
+  {
+    title: "शिकायत दर्ज करें",
+    message: "पानी की समस्या होने पर ऐप में अपनी शिकायत दर्ज करें।"
+  },
+  {
+    title: "शिकायत ट्रैक करें",
+    message: "अपनी Report ID से शिकायत की स्थिति जानें।"
+  },
+  {
+    title: "जल संरक्षण",
+    message: "पानी बचाएँ, जीवन बचाएँ। पानी बर्बाद न करें।"
+  },
+  {
+    title: "ऐप अपडेट",
+    message: "नई सुविधाओं और जरूरी सूचनाओं के लिए ऐप से जुड़े रहें।"
+  }
+];
+
 function showNotice() {
-  alert("नई सूचनाएँ अभी उपलब्ध नहीं हैं।");
+  const message = notifications.map((item, index) => {
+    return `${index + 1}. ${item.title}\n${item.message}`;
+  }).join("\n\n");
+
+  alert(
+    "🔔 JALMITRA 360 सूचना केंद्र\n\n" +
+    message +
+    "\n\n💧 धन्यवाद!\nJALMITRA 360"
+  );
 }
 
 $("#notificationBtn")?.addEventListener("click", showNotice);
@@ -200,9 +230,8 @@ photoInput?.addEventListener("change", () => {
   setMessage(uploadStatus, "फोटो अपलोड के लिए तैयार है।");
 });
 
-// UPLOAD PHOTO TO FIREBASE STORAGE
+// FIREBASE PHOTO UPLOAD
 async function uploadComplaintPhoto(file, reportId) {
-  // Anonymous login for public complaint submission
   if (!auth.currentUser) {
     await signInAnonymously(auth);
   }
@@ -230,7 +259,7 @@ async function uploadComplaintPhoto(file, reportId) {
       "state_changed",
       (snapshot) => {
         const percent = Math.round(
-          (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+          snapshot.bytesTransferred / snapshot.totalBytes * 100
         );
 
         setMessage(
@@ -271,10 +300,8 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
     delete complaintData.photo;
 
     const reportId = makeReportId();
-
     let photoData = {};
 
-    // Upload selected photo
     if (selectedPhoto) {
       photoData = await uploadComplaintPhoto(
         selectedPhoto,
@@ -316,15 +343,12 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
     }
 
     setMessage(uploadStatus, "");
-
     go("success");
 
   } catch (error) {
     console.error("Complaint submission failed:", error);
 
-    alert(
-      "शिकायत जमा नहीं हो सकी: " + error.message
-    );
+    alert("शिकायत जमा नहीं हो सकी: " + error.message);
 
   } finally {
     if (submitButton) {
@@ -387,22 +411,12 @@ $("#trackBtn")?.addEventListener("click", async () => {
     statusLine.textContent =
       "स्थिति: " + (statusLabels[item.status] || item.status);
 
-    result.append(
-      heading,
-      idLine,
-      typeLine,
-      statusLine
-    );
-
+    result.append(heading, idLine, typeLine, statusLine);
     output.append(result);
 
   } catch (error) {
     console.error("Tracking failed:", error);
-
-    setMessage(
-      output,
-      "ट्रैकिंग उपलब्ध नहीं है: " + error.message
-    );
+    setMessage(output, "ट्रैकिंग उपलब्ध नहीं है: " + error.message);
   }
 });
 
@@ -438,7 +452,6 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
     $("#adminDashboard")?.classList.remove("hidden");
 
     setMessage(message, "");
-
     await refreshAdmin();
 
   } catch (error) {
@@ -446,8 +459,7 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 
     setMessage(
       message,
-      "लॉगिन असफल: " +
-      (error.code || "") + " " + error.message
+      "लॉगिन असफल: " + (error.code || "") + " " + error.message
     );
 
     if (auth.currentUser) {
@@ -461,7 +473,6 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 
 // RESTORE ADMIN SESSION
 onAuthStateChanged(auth, async (user) => {
-  // Anonymous users are complaint submitters, not admins
   if (user?.isAnonymous) return;
 
   if (!user) {
@@ -515,7 +526,6 @@ async function refreshAdmin() {
     );
 
     const snapshot = await getDocs(complaintsQuery);
-
     const complaints = snapshot.docs.map((item) => item.data());
 
     if ($("#totalCount")) {
@@ -524,23 +534,17 @@ async function refreshAdmin() {
 
     if ($("#newCount")) {
       $("#newCount").textContent =
-        complaints.filter(
-          (item) => item.status === "Pending"
-        ).length;
+        complaints.filter((item) => item.status === "Pending").length;
     }
 
     if ($("#pendingCount")) {
       $("#pendingCount").textContent =
-        complaints.filter(
-          (item) => item.status === "In Review"
-        ).length;
+        complaints.filter((item) => item.status === "In Review").length;
     }
 
     if ($("#doneCount")) {
       $("#doneCount").textContent =
-        complaints.filter(
-          (item) => item.status === "Resolved"
-        ).length;
+        complaints.filter((item) => item.status === "Resolved").length;
     }
 
     const list = $("#adminList");
@@ -572,13 +576,12 @@ async function refreshAdmin() {
       const description = document.createElement("p");
       description.textContent = item.details || "";
 
-      // SHOW COMPLAINT PHOTO
+      // COMPLAINT PHOTO
       if (item.photoURL) {
-        const photoBox = document.createElement("div");
-
         const photo = document.createElement("img");
+
         photo.src = item.photoURL;
-        photo.alt = "शिकायत के साथ भेजी गई फोटो";
+        photo.alt = "शिकायत की फोटो";
         photo.loading = "lazy";
         photo.style.maxWidth = "250px";
         photo.style.width = "100%";
@@ -591,8 +594,7 @@ async function refreshAdmin() {
           photo.alt = "फोटो लोड नहीं हो सकी";
         };
 
-        photoBox.append(photo);
-        row.append(photoBox);
+        row.append(photo);
       }
 
       const select = document.createElement("select");
@@ -629,20 +631,12 @@ async function refreshAdmin() {
 
         } catch (error) {
           console.error("Status update failed:", error);
-
           alert("स्थिति अपडेट नहीं हुई: " + error.message);
-
           select.disabled = false;
         }
       });
 
-      row.append(
-        title,
-        detail,
-        description,
-        select
-      );
-
+      row.append(title, detail, description, select);
       list.append(row);
     });
 
@@ -659,22 +653,17 @@ async function refreshAdmin() {
 // COMPLAINT STATISTICS
 async function refreshStats() {
   const statsText = $("#statsText");
-
   if (!statsText) return;
 
   try {
-    const snapshot = await getDocs(
-      collection(db, "tracking")
-    );
+    const snapshot = await getDocs(collection(db, "tracking"));
 
     statsText.textContent =
       `अब तक ${snapshot.size} शिकायतें दर्ज हुई हैं।`;
 
   } catch (error) {
     console.error("Stats failed:", error);
-
-    statsText.textContent =
-      "आंकड़े अभी उपलब्ध नहीं हैं।";
+    statsText.textContent = "आंकड़े अभी उपलब्ध नहीं हैं।";
   }
 }
 
@@ -683,3 +672,4 @@ window.JALMITRA_CONTACT = {
   email: ADMIN_EMAIL,
   phone: CONTACT_PHONE
 };
+      
