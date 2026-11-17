@@ -683,4 +683,3 @@ window.JALMITRA_CONTACT = {
   email: ADMIN_EMAIL,
   phone: CONTACT_PHONE
 };
-        
