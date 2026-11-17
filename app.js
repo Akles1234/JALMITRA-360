@@ -2,33 +2,20 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
 
 import {
-  getFirestore,
-  doc,
-  getDoc,
-  getDocs,
-  collection,
-  query,
-  orderBy,
-  writeBatch,
-  serverTimestamp
+  getFirestore, doc, getDoc, getDocs, collection,
+  query, orderBy, writeBatch, serverTimestamp
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-firestore.js";
 
 import {
-  getAuth,
-  signInWithEmailAndPassword,
-  signInAnonymously,
-  signOut,
-  onAuthStateChanged
+  getAuth, signInWithEmailAndPassword, signInAnonymously,
+  signOut, onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
 
 import {
-  getStorage,
-  ref,
-  uploadBytesResumable,
-  getDownloadURL
+  getStorage, ref, uploadBytesResumable, getDownloadURL
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-storage.js";
 
-// FIREBASE CONFIGURATION
+// FIREBASE CONFIG
 const firebaseConfig = {
   apiKey: "AIzaSyDCqrxb4NVNZ5rP2AGNb6biUTw0Xns9Ax8",
   authDomain: "jalmitra-360.firebaseapp.com",
@@ -52,14 +39,14 @@ const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
 const storage = getStorage(firebaseApp);
 
-const $ = (selector) => document.querySelector(selector);
-const $$ = (selector) => [...document.querySelectorAll(selector)];
+const $ = (s) => document.querySelector(s);
+const $$ = (s) => [...document.querySelectorAll(s)];
 
-function setMessage(element, message) {
-  if (element) element.textContent = message;
+function setMessage(el, msg) {
+  if (el) el.textContent = msg;
 }
 
-// ADMIN VERIFICATION
+// ADMIN CHECK
 async function isAdminUser(user) {
   if (!user || user.isAnonymous) return false;
 
@@ -67,20 +54,16 @@ async function isAdminUser(user) {
     throw new Error("यह UID अधिकृत Admin सूची में नहीं है।");
   }
 
-  const adminSnap = await getDoc(doc(db, "admins", user.uid));
+  const snap = await getDoc(doc(db, "admins", user.uid));
 
-  if (!adminSnap.exists()) {
-    throw new Error("Admin का Firestore डॉक्यूमेंट नहीं मिला।");
-  }
-
-  if (adminSnap.data().active !== true) {
+  if (!snap.exists() || snap.data().active !== true) {
     throw new Error("Admin account सक्रिय नहीं है।");
   }
 
   return true;
 }
 
-// INDIAN STATES
+// STATES
 const states = [
   "आंध्र प्रदेश", "अरुणाचल प्रदेश", "असम", "बिहार", "छत्तीसगढ़",
   "गोवा", "गुजरात", "हरियाणा", "हिमाचल प्रदेश", "झारखंड",
@@ -91,19 +74,15 @@ const states = [
 ];
 
 if ($("#state") && $("#state").options.length <= 1) {
-  states.forEach((state) => {
-    $("#state").add(new Option(state, state));
-  });
+  states.forEach(s => $("#state").add(new Option(s, s)));
 }
 
 // NAVIGATION
 function go(pageId) {
-  $$(".page").forEach((page) => {
-    page.classList.toggle("active", page.id === pageId);
-  });
+  $$(".page").forEach(p => p.classList.toggle("active", p.id === pageId));
 
-  $$("[data-page]").forEach((button) => {
-    button.classList.toggle("selected", button.dataset.page === pageId);
+  $$("[data-page]").forEach(b => {
+    b.classList.toggle("selected", b.dataset.page === pageId);
   });
 
   $("#drawer")?.classList.add("hidden");
@@ -113,46 +92,62 @@ function go(pageId) {
   if (pageId === "stats") refreshStats();
 }
 
-$$("[data-page]").forEach((button) => {
-  button.addEventListener("click", () => go(button.dataset.page));
+$$("[data-page]").forEach(b => {
+  b.addEventListener("click", () => go(b.dataset.page));
 });
 
 $("#menuBtn")?.addEventListener("click", () => {
   $("#drawer")?.classList.toggle("hidden");
 });
 
-// NOTIFICATION CENTER
+// BEAUTIFUL NOTIFICATION CENTER
 const notifications = [
   {
-    title: "स्वागत संदेश",
-    message: "JALMITRA 360 में आपका हार्दिक स्वागत है।",
-    date: "महत्वपूर्ण सूचना"
+    icon: "🌊",
+    title: "JALMITRA 360 में आपका स्वागत है!",
+    message: "आपकी एक छोटी-सी पहल हजारों लोगों के जीवन में बड़ा बदलाव ला सकती है। आइए, मिलकर हर घर तक स्वच्छ जल पहुँचाने का संकल्प लें।",
+    tag: "WELCOME"
   },
   {
-    title: "शिकायत दर्ज करें",
-    message: "पानी की समस्या होने पर ऐप में अपनी शिकायत दर्ज करें।",
-    date: "सेवा सूचना"
+    icon: "💧",
+    title: "पानी की हर बूँद अनमोल है!",
+    message: "जल ही जीवन है। पानी को व्यर्थ न बहाएँ। आज पानी बचाएँ, आने वाली पीढ़ियों का भविष्य सुरक्षित बनाएँ।",
+    tag: "SAVE WATER"
   },
   {
-    title: "शिकायत ट्रैक करें",
-    message: "अपनी Report ID से शिकायत की स्थिति जानें।",
-    date: "सेवा सूचना"
+    icon: "📢",
+    title: "अब आपकी शिकायत होगी आसान!",
+    message: "पानी से जुड़ी किसी भी समस्या के लिए ऐप में अपनी शिकायत दर्ज करें और अपनी Report ID सुरक्षित रखें।",
+    tag: "PUBLIC SERVICE"
   },
   {
-    title: "जल संरक्षण",
-    message: "पानी बचाएँ, जीवन बचाएँ। पानी बर्बाद न करें।",
-    date: "जागरूकता संदेश"
+    icon: "🔍",
+    title: "अपनी शिकायत का स्टेटस जानें!",
+    message: "अपनी Report ID डालकर कभी भी शिकायत की स्थिति चेक करें। आपकी समस्या की जानकारी आपके लिए उपलब्ध है।",
+    tag: "TRACK REPORT"
   },
   {
-    title: "ऐप अपडेट",
-    message: "नई सुविधाओं और जरूरी सूचनाओं के लिए ऐप से जुड़े रहें।",
-    date: "ऐप सूचना"
+    icon: "🤝",
+    title: "आपकी आवाज़, हमारा उद्देश्य!",
+    message: "आपकी शिकायत और सुझाव बेहतर जल सेवा की दिशा में एक महत्वपूर्ण कदम हैं। जागरूक नागरिक बनें और दूसरों को भी जागरूक करें।",
+    tag: "TOGETHER"
+  },
+  {
+    icon: "🌱",
+    title: "आइए जल संरक्षण का संकल्प लें!",
+    message: "नल खुला न छोड़ें, पानी का सही उपयोग करें और वर्षा जल संचयन को बढ़ावा दें। जल बचाना हम सभी की जिम्मेदारी है।",
+    tag: "GREEN FUTURE"
+  },
+  {
+    icon: "❤️",
+    title: "JALMITRA 360 परिवार की ओर से धन्यवाद!",
+    message: "इस डिजिटल जल सेवा से जुड़ने के लिए आपका आभार। आपका सहयोग ही हमारी सबसे बड़ी ताकत है।",
+    tag: "THANK YOU"
   }
 ];
 
 function showNotice() {
-  const oldModal = $("#jalmitraNoticeModal");
-  oldModal?.remove();
+  $("#jalmitraNoticeModal")?.remove();
 
   const overlay = document.createElement("div");
   overlay.id = "jalmitraNoticeModal";
@@ -160,80 +155,144 @@ function showNotice() {
   Object.assign(overlay.style, {
     position: "fixed",
     inset: "0",
-    zIndex: "99999",
-    background: "rgba(0,0,0,0.65)",
+    zIndex: "999999",
+    background: "rgba(0,15,35,.78)",
+    backdropFilter: "blur(6px)",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    padding: "16px"
+    padding: "12px"
   });
 
   const panel = document.createElement("div");
 
   Object.assign(panel.style, {
     width: "100%",
-    maxWidth: "430px",
-    maxHeight: "85vh",
+    maxWidth: "440px",
+    maxHeight: "88vh",
     overflowY: "auto",
     background: "#ffffff",
-    color: "#17212b",
-    borderRadius: "18px",
-    padding: "20px",
+    color: "#173047",
+    borderRadius: "22px",
+    padding: "18px",
     boxSizing: "border-box",
-    boxShadow: "0 10px 35px rgba(0,0,0,0.3)"
+    boxShadow: "0 15px 50px rgba(0,0,0,.35)"
   });
+
+  const banner = document.createElement("div");
+
+  Object.assign(banner.style, {
+    background: "linear-gradient(135deg,#075985,#0891b2,#14b8a6)",
+    color: "white",
+    padding: "22px 15px",
+    borderRadius: "17px",
+    textAlign: "center",
+    marginBottom: "17px"
+  });
+
+  const logo = document.createElement("div");
+  logo.textContent = "💧";
+
+  Object.assign(logo.style, {
+    fontSize: "42px",
+    marginBottom: "6px"
+  });
+
+  const brand = document.createElement("h2");
+  brand.textContent = "JALMITRA 360";
+
+  Object.assign(brand.style, {
+    margin: "0",
+    fontSize: "24px",
+    letterSpacing: "1px"
+  });
+
+  const subtitle = document.createElement("p");
+  subtitle.textContent = "जल सेवा • जन सेवा • हमारा संकल्प";
+
+  Object.assign(subtitle.style, {
+    margin: "8px 0 0",
+    fontSize: "13px",
+    color: "#e0f2fe"
+  });
+
+  banner.append(logo, brand, subtitle);
 
   const header = document.createElement("div");
 
   Object.assign(header.style, {
     display: "flex",
-    justifyContent: "space-between",
     alignItems: "center",
-    gap: "10px",
-    marginBottom: "18px"
+    justifyContent: "space-between",
+    marginBottom: "14px"
   });
 
-  const heading = document.createElement("h2");
-  heading.textContent = "🔔 सूचना केंद्र";
+  const heading = document.createElement("h3");
+  heading.textContent = "🔔 आज की खास सूचनाएँ";
   heading.style.margin = "0";
-  heading.style.fontSize = "21px";
+  heading.style.fontSize = "17px";
 
   const close = document.createElement("button");
-  close.type = "button";
   close.textContent = "✕";
+  close.type = "button";
 
   Object.assign(close.style, {
-    border: "none",
-    background: "#edf2f7",
+    width: "35px",
+    height: "35px",
+    border: "0",
     borderRadius: "50%",
-    width: "36px",
-    height: "36px",
-    fontSize: "18px",
+    background: "#e8f1f7",
+    color: "#173047",
+    fontSize: "17px",
     cursor: "pointer"
   });
 
   close.addEventListener("click", () => overlay.remove());
 
   header.append(heading, close);
-  panel.append(header);
+  panel.append(banner, header);
 
-  notifications.forEach((item) => {
+  notifications.forEach((item, index) => {
     const card = document.createElement("div");
 
     Object.assign(card.style, {
-      background: "#f1f7ff",
-      border: "1px solid #dce9f7",
-      borderRadius: "12px",
-      padding: "13px",
-      marginBottom: "11px"
+      display: "flex",
+      gap: "12px",
+      padding: "14px 12px",
+      marginBottom: "11px",
+      borderRadius: "14px",
+      border: "1px solid #dceaf2",
+      background: index % 2 === 0 ? "#f0f9ff" : "#f0fdfa"
     });
 
-    const title = document.createElement("h3");
-    title.textContent = "💧 " + item.title;
+    const icon = document.createElement("div");
+    icon.textContent = item.icon;
+
+    Object.assign(icon.style, {
+      fontSize: "28px",
+      minWidth: "35px",
+      textAlign: "center"
+    });
+
+    const content = document.createElement("div");
+    content.style.flex = "1";
+
+    const tag = document.createElement("small");
+    tag.textContent = item.tag;
+
+    Object.assign(tag.style, {
+      color: "#0891b2",
+      fontWeight: "bold",
+      fontSize: "10px",
+      letterSpacing: "1px"
+    });
+
+    const title = document.createElement("h4");
+    title.textContent = item.title;
 
     Object.assign(title.style, {
-      margin: "0 0 7px",
-      fontSize: "16px",
+      margin: "4px 0 6px",
+      fontSize: "15px",
       color: "#075985"
     });
 
@@ -241,33 +300,40 @@ function showNotice() {
     message.textContent = item.message;
 
     Object.assign(message.style, {
-      margin: "0 0 8px",
-      fontSize: "14px",
-      lineHeight: "1.6"
+      margin: "0",
+      fontSize: "13px",
+      lineHeight: "1.65",
+      color: "#334155"
     });
 
-    const date = document.createElement("small");
-    date.textContent = item.date;
-    date.style.color = "#64748b";
-
-    card.append(title, message, date);
+    content.append(tag, title, message);
+    card.append(icon, content);
     panel.append(card);
   });
 
-  const footer = document.createElement("p");
-  footer.textContent = "💧 धन्यवाद! JALMITRA 360";
+  const footer = document.createElement("div");
 
   Object.assign(footer.style, {
     textAlign: "center",
-    fontWeight: "bold",
-    margin: "18px 0 0"
+    background: "#ecfeff",
+    borderRadius: "13px",
+    padding: "14px 8px",
+    marginTop: "15px"
   });
 
+  footer.textContent = "💙 जल है तो कल है! 💧";
+
+  const thanks = document.createElement("p");
+  thanks.textContent = "आपका दिन शुभ और मंगलमय हो!";
+  thanks.style.margin = "7px 0 0";
+  thanks.style.fontSize = "12px";
+
+  footer.append(thanks);
   panel.append(footer);
   overlay.append(panel);
 
-  overlay.addEventListener("click", (event) => {
-    if (event.target === overlay) overlay.remove();
+  overlay.addEventListener("click", e => {
+    if (e.target === overlay) overlay.remove();
   });
 
   document.body.append(overlay);
@@ -276,14 +342,14 @@ function showNotice() {
 $("#notificationBtn")?.addEventListener("click", showNotice);
 $("#bottomNotice")?.addEventListener("click", showNotice);
 
-// GENERATE REPORT ID
+// REPORT ID
 function makeReportId() {
-  const date = new Date();
+  const d = new Date();
 
   const datePart = [
-    date.getFullYear(),
-    String(date.getMonth() + 1).padStart(2, "0"),
-    String(date.getDate()).padStart(2, "0")
+    d.getFullYear(),
+    String(d.getMonth() + 1).padStart(2, "0"),
+    String(d.getDate()).padStart(2, "0")
   ].join("");
 
   const randomPart = crypto.randomUUID()
@@ -315,9 +381,7 @@ photoInput?.addEventListener("change", () => {
 
   if (!file) return;
 
-  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
-
-  if (!allowedTypes.includes(file.type)) {
+  if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
     alert("कृपया JPG, PNG या WEBP फोटो चुनें।");
     photoInput.value = "";
     return;
@@ -339,68 +403,50 @@ photoInput?.addEventListener("change", () => {
   setMessage(uploadStatus, "फोटो अपलोड के लिए तैयार है।");
 });
 
-// FIREBASE PHOTO UPLOAD
+// PHOTO UPLOAD
 async function uploadComplaintPhoto(file, reportId) {
-  if (!auth.currentUser) {
-    await signInAnonymously(auth);
-  }
+  if (!auth.currentUser) await signInAnonymously(auth);
 
   const uid = auth.currentUser.uid;
-
   const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
-
-  const filePath =
-    `complaints/${uid}/${reportId}/${Date.now()}_${safeName}`;
+  const filePath = `complaints/${uid}/${reportId}/${Date.now()}_${safeName}`;
 
   const storageRef = ref(storage, filePath);
-
-  const uploadTask = uploadBytesResumable(
-    storageRef,
-    file,
-    { contentType: file.type }
-  );
-
-  await new Promise((resolve, reject) => {
-    uploadTask.on(
-      "state_changed",
-      (snapshot) => {
-        const percent = Math.round(
-          snapshot.bytesTransferred / snapshot.totalBytes * 100
-        );
-
-        setMessage(uploadStatus, `फोटो अपलोड हो रहा है: ${percent}%`);
-      },
-      reject,
-      resolve
-    );
+  const task = uploadBytesResumable(storageRef, file, {
+    contentType: file.type
   });
 
-  const photoURL = await getDownloadURL(uploadTask.snapshot.ref);
+  await new Promise((resolve, reject) => {
+    task.on("state_changed", snapshot => {
+      const percent = Math.round(
+        snapshot.bytesTransferred / snapshot.totalBytes * 100
+      );
+      setMessage(uploadStatus, `फोटो अपलोड हो रहा है: ${percent}%`);
+    }, reject, resolve);
+  });
 
   return {
-    photoURL,
+    photoURL: await getDownloadURL(task.snapshot.ref),
     photoPath: filePath
   };
 }
 
 // SUBMIT COMPLAINT
-$("#complaintForm")?.addEventListener("submit", async (event) => {
+$("#complaintForm")?.addEventListener("submit", async event => {
   event.preventDefault();
 
   const form = event.currentTarget;
-  const submitButton = form.querySelector('[type="submit"]');
-  const originalText = submitButton?.textContent;
+  const button = form.querySelector('[type="submit"]');
+  const originalText = button?.textContent;
 
-  if (submitButton) {
-    submitButton.disabled = true;
-    submitButton.textContent = "शिकायत जमा हो रही है...";
+  if (button) {
+    button.disabled = true;
+    button.textContent = "शिकायत जमा हो रही है...";
   }
 
   try {
-    const formData = new FormData(form);
-    const complaintData = Object.fromEntries(formData.entries());
-
-    delete complaintData.photo;
+    const data = Object.fromEntries(new FormData(form).entries());
+    delete data.photo;
 
     const reportId = makeReportId();
     let photoData = {};
@@ -414,7 +460,7 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
     const batch = writeBatch(db);
 
     batch.set(doc(db, "complaints", reportId), {
-      ...complaintData,
+      ...data,
       ...photoData,
       reportId,
       status: "Pending",
@@ -424,15 +470,13 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
     batch.set(doc(db, "tracking", reportId), {
       reportId,
       status: "Pending",
-      type: complaintData.type,
+      type: data.type,
       createdAt: serverTimestamp()
     });
 
     await batch.commit();
 
-    if ($("#successId")) {
-      $("#successId").textContent = reportId;
-    }
+    if ($("#successId")) $("#successId").textContent = reportId;
 
     form.reset();
     selectedPhoto = null;
@@ -446,13 +490,13 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
     go("success");
 
   } catch (error) {
-    console.error("Complaint submission failed:", error);
+    console.error(error);
     alert("शिकायत जमा नहीं हो सकी: " + error.message);
 
   } finally {
-    if (submitButton) {
-      submitButton.disabled = false;
-      submitButton.textContent = originalText || "शिकायत जमा करें";
+    if (button) {
+      button.disabled = false;
+      button.textContent = originalText || "शिकायत जमा करें";
     }
   }
 });
@@ -470,15 +514,14 @@ $("#trackBtn")?.addEventListener("click", async () => {
   setMessage(output, "शिकायत की स्थिति देखी जा रही है...");
 
   try {
-    const snapshot = await getDoc(doc(db, "tracking", reportId));
+    const snap = await getDoc(doc(db, "tracking", reportId));
 
-    if (!snapshot.exists()) {
+    if (!snap.exists()) {
       setMessage(output, "इस Report ID की शिकायत नहीं मिली।");
       return;
     }
 
-    const item = snapshot.data();
-
+    const item = snap.data();
     output.replaceChildren();
 
     const result = document.createElement("div");
@@ -487,27 +530,26 @@ $("#trackBtn")?.addEventListener("click", async () => {
     const heading = document.createElement("b");
     heading.textContent = "शिकायत की स्थिति";
 
-    const idLine = document.createElement("p");
-    idLine.textContent = "Report ID: " + item.reportId;
+    const id = document.createElement("p");
+    id.textContent = "Report ID: " + item.reportId;
 
-    const typeLine = document.createElement("p");
-    typeLine.textContent = "समस्या: " + (item.type || "उपलब्ध नहीं");
+    const type = document.createElement("p");
+    type.textContent = "समस्या: " + (item.type || "उपलब्ध नहीं");
 
-    const statusLabels = {
+    const labels = {
       Pending: "नई शिकायत",
       "In Review": "जांच जारी",
       Resolved: "समाधान हो गया"
     };
 
-    const statusLine = document.createElement("p");
-    statusLine.textContent =
-      "स्थिति: " + (statusLabels[item.status] || item.status);
+    const status = document.createElement("p");
+    status.textContent = "स्थिति: " + (labels[item.status] || item.status);
 
-    result.append(heading, idLine, typeLine, statusLine);
+    result.append(heading, id, type, status);
     output.append(result);
 
   } catch (error) {
-    console.error("Tracking failed:", error);
+    console.error(error);
     setMessage(output, "ट्रैकिंग उपलब्ध नहीं है: " + error.message);
   }
 });
@@ -525,12 +567,10 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
   }
 
   if (button) button.disabled = true;
-
   setMessage(message, "लॉगिन हो रहा है...");
 
   try {
     const credential = await signInWithEmailAndPassword(auth, email, password);
-
     await isAdminUser(credential.user);
 
     $("#adminLogin")?.classList.add("hidden");
@@ -540,16 +580,10 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
     await refreshAdmin();
 
   } catch (error) {
-    console.error("Admin login failed:", error);
+    console.error(error);
+    setMessage(message, "लॉगिन असफल: " + (error.code || "") + " " + error.message);
 
-    setMessage(
-      message,
-      "लॉगिन असफल: " + (error.code || "") + " " + error.message
-    );
-
-    if (auth.currentUser) {
-      await signOut(auth).catch(console.error);
-    }
+    if (auth.currentUser) await signOut(auth).catch(console.error);
 
   } finally {
     if (button) button.disabled = false;
@@ -557,7 +591,7 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 });
 
 // RESTORE ADMIN SESSION
-onAuthStateChanged(auth, async (user) => {
+onAuthStateChanged(auth, async user => {
   if (user?.isAnonymous) return;
 
   if (!user) {
@@ -575,11 +609,9 @@ onAuthStateChanged(auth, async (user) => {
     await refreshAdmin();
 
   } catch (error) {
-    console.error("Session check failed:", error);
-
+    console.error(error);
     $("#adminLogin")?.classList.remove("hidden");
     $("#adminDashboard")?.classList.add("hidden");
-
     await signOut(auth).catch(console.error);
   }
 });
@@ -589,9 +621,8 @@ $("#adminLogoutBtn")?.addEventListener("click", async () => {
   try {
     await signOut(auth);
     go("home");
-
   } catch (error) {
-    console.error("Logout failed:", error);
+    console.error(error);
     alert("Logout नहीं हो सका।");
   }
 });
@@ -599,37 +630,31 @@ $("#adminLogoutBtn")?.addEventListener("click", async () => {
 // ADMIN DASHBOARD
 async function refreshAdmin() {
   const user = auth.currentUser;
-
   if (!user || user.isAnonymous) return;
 
   try {
     await isAdminUser(user);
 
-    const complaintsQuery = query(
+    const q = query(
       collection(db, "complaints"),
       orderBy("createdAt", "desc")
     );
 
-    const snapshot = await getDocs(complaintsQuery);
-    const complaints = snapshot.docs.map((item) => item.data());
+    const snap = await getDocs(q);
+    const complaints = snap.docs.map(d => d.data());
 
-    if ($("#totalCount")) {
-      $("#totalCount").textContent = complaints.length;
-    }
-
+    if ($("#totalCount")) $("#totalCount").textContent = complaints.length;
     if ($("#newCount")) {
       $("#newCount").textContent =
-        complaints.filter((item) => item.status === "Pending").length;
+        complaints.filter(x => x.status === "Pending").length;
     }
-
     if ($("#pendingCount")) {
       $("#pendingCount").textContent =
-        complaints.filter((item) => item.status === "In Review").length;
+        complaints.filter(x => x.status === "In Review").length;
     }
-
     if ($("#doneCount")) {
       $("#doneCount").textContent =
-        complaints.filter((item) => item.status === "Resolved").length;
+        complaints.filter(x => x.status === "Resolved").length;
     }
 
     const list = $("#adminList");
@@ -645,7 +670,7 @@ async function refreshAdmin() {
       return;
     }
 
-    complaints.forEach((item) => {
+    complaints.forEach(item => {
       const row = document.createElement("div");
       row.className = "complaint-row";
 
@@ -675,10 +700,6 @@ async function refreshAdmin() {
           borderRadius: "10px"
         });
 
-        photo.onerror = () => {
-          photo.alt = "फोटो लोड नहीं हो सकी";
-        };
-
         row.append(photo);
       }
 
@@ -695,27 +716,22 @@ async function refreshAdmin() {
       select.value = item.status || "Pending";
 
       select.addEventListener("change", async () => {
-        const newStatus = select.value;
         select.disabled = true;
 
         try {
           const batch = writeBatch(db);
-
-          batch.update(
-            doc(db, "complaints", item.reportId),
-            { status: newStatus }
-          );
-
-          batch.update(
-            doc(db, "tracking", item.reportId),
-            { status: newStatus }
-          );
+          batch.update(doc(db, "complaints", item.reportId), {
+            status: select.value
+          });
+          batch.update(doc(db, "tracking", item.reportId), {
+            status: select.value
+          });
 
           await batch.commit();
           await refreshAdmin();
 
         } catch (error) {
-          console.error("Status update failed:", error);
+          console.error(error);
           alert("स्थिति अपडेट नहीं हुई: " + error.message);
           select.disabled = false;
         }
@@ -726,27 +742,26 @@ async function refreshAdmin() {
     });
 
   } catch (error) {
-    console.error("Admin list failed:", error);
+    console.error(error);
     setMessage($("#adminList"), "शिकायतें लोड नहीं हुईं: " + error.message);
   }
 }
 
-// COMPLAINT STATISTICS
+// STATISTICS
 async function refreshStats() {
   const statsText = $("#statsText");
   if (!statsText) return;
 
   try {
-    const snapshot = await getDocs(collection(db, "tracking"));
-    statsText.textContent = `अब तक ${snapshot.size} शिकायतें दर्ज हुई हैं।`;
-
+    const snap = await getDocs(collection(db, "tracking"));
+    statsText.textContent = `अब तक ${snap.size} शिकायतें दर्ज हुई हैं।`;
   } catch (error) {
-    console.error("Stats failed:", error);
+    console.error(error);
     statsText.textContent = "आंकड़े अभी उपलब्ध नहीं हैं।";
   }
 }
 
-// CONTACT INFORMATION
+// CONTACT
 window.JALMITRA_CONTACT = {
   email: ADMIN_EMAIL,
   phone: CONTACT_PHONE
