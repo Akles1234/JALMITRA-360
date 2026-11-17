@@ -1,4 +1,3 @@
-
 import { initializeApp } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-app.js";
 
 import {
@@ -16,9 +15,17 @@ import {
 import {
   getAuth,
   signInWithEmailAndPassword,
+  signInAnonymously,
   signOut,
   onAuthStateChanged
 } from "https://www.gstatic.com/firebasejs/13.3.0/firebase-auth.js";
+
+import {
+  getStorage,
+  ref,
+  uploadBytesResumable,
+  getDownloadURL
+} from "https://www.gstatic.com/firebasejs/13.3.0/firebase-storage.js";
 
 // FIREBASE CONFIGURATION
 const firebaseConfig = {
@@ -42,6 +49,7 @@ const ALLOWED_ADMIN_UIDS = [
 const firebaseApp = initializeApp(firebaseConfig);
 const db = getFirestore(firebaseApp);
 const auth = getAuth(firebaseApp);
+const storage = getStorage(firebaseApp);
 
 const $ = (selector) => document.querySelector(selector);
 const $$ = (selector) => [...document.querySelectorAll(selector)];
@@ -52,10 +60,7 @@ function setMessage(element, message) {
 
 // ADMIN VERIFICATION
 async function isAdminUser(user) {
-  if (!user) return false;
-
-  console.log("LOGIN EMAIL:", user.email);
-  console.log("LOGIN UID:", user.uid);
+  if (!user || user.isAnonymous) return false;
 
   if (!ALLOWED_ADMIN_UIDS.includes(user.uid)) {
     throw new Error("यह UID अधिकृत Admin सूची में नहीं है: " + user.uid);
@@ -64,24 +69,14 @@ async function isAdminUser(user) {
   const adminRef = doc(db, "admins", user.uid);
   const adminSnap = await getDoc(adminRef);
 
-  console.log("ADMIN DOCUMENT EXISTS:", adminSnap.exists());
-
   if (!adminSnap.exists()) {
-    throw new Error("admins में UID का डॉक्यूमेंट नहीं मिला: " + user.uid);
+    throw new Error("Admin का Firestore डॉक्यूमेंट नहीं मिला।");
   }
 
   const adminData = adminSnap.data();
 
-  console.log("ADMIN DATA:", adminData);
-  console.log("ACTIVE VALUE:", adminData.active);
-  console.log("ACTIVE TYPE:", typeof adminData.active);
-
   if (adminData.active !== true) {
-    throw new Error(
-      "Firestore में active की असली वैल्यू true नहीं है। मिला: " +
-      JSON.stringify(adminData.active) +
-      " (Type: " + typeof adminData.active + ")"
-    );
+    throw new Error("Admin account सक्रिय नहीं है।");
   }
 
   return true;
@@ -156,6 +151,106 @@ function makeReportId() {
   return `JM360-${datePart}-${randomPart}`;
 }
 
+// PHOTO PREVIEW
+let selectedPhoto = null;
+
+const photoInput = $("#complaintPhoto");
+const photoPreview = $("#photoPreview");
+const uploadStatus = $("#uploadStatus");
+
+photoInput?.addEventListener("change", () => {
+  const file = photoInput.files?.[0];
+
+  selectedPhoto = null;
+
+  if (photoPreview) {
+    photoPreview.style.display = "none";
+    photoPreview.removeAttribute("src");
+  }
+
+  setMessage(uploadStatus, "");
+
+  if (!file) return;
+
+  const allowedTypes = [
+    "image/jpeg",
+    "image/png",
+    "image/webp"
+  ];
+
+  if (!allowedTypes.includes(file.type)) {
+    alert("कृपया JPG, PNG या WEBP फोटो चुनें।");
+    photoInput.value = "";
+    return;
+  }
+
+  if (file.size > 5 * 1024 * 1024) {
+    alert("फोटो का आकार 5 MB से कम होना चाहिए।");
+    photoInput.value = "";
+    return;
+  }
+
+  selectedPhoto = file;
+
+  if (photoPreview) {
+    photoPreview.src = URL.createObjectURL(file);
+    photoPreview.style.display = "block";
+  }
+
+  setMessage(uploadStatus, "फोटो अपलोड के लिए तैयार है।");
+});
+
+// UPLOAD PHOTO TO FIREBASE STORAGE
+async function uploadComplaintPhoto(file, reportId) {
+  // Anonymous login for public complaint submission
+  if (!auth.currentUser) {
+    await signInAnonymously(auth);
+  }
+
+  const uid = auth.currentUser.uid;
+
+  const safeName = file.name.replace(
+    /[^a-zA-Z0-9._-]/g,
+    "_"
+  );
+
+  const filePath =
+    `complaints/${uid}/${reportId}/${Date.now()}_${safeName}`;
+
+  const storageRef = ref(storage, filePath);
+
+  const uploadTask = uploadBytesResumable(
+    storageRef,
+    file,
+    { contentType: file.type }
+  );
+
+  await new Promise((resolve, reject) => {
+    uploadTask.on(
+      "state_changed",
+      (snapshot) => {
+        const percent = Math.round(
+          (snapshot.bytesTransferred / snapshot.totalBytes) * 100
+        );
+
+        setMessage(
+          uploadStatus,
+          `फोटो अपलोड हो रहा है: ${percent}%`
+        );
+      },
+      reject,
+      resolve
+    );
+  });
+
+  const photoURL = await getDownloadURL(uploadTask.snapshot.ref);
+
+  return {
+    photoURL,
+    photoPath: filePath
+  };
+}
+
 // SUBMIT COMPLAINT
 $("#complaintForm")?.addEventListener("submit", async (event) => {
   event.preventDefault();
@@ -176,10 +271,24 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
     delete complaintData.photo;
 
     const reportId = makeReportId();
+
+    let photoData = {};
+
+    // Upload selected photo
+    if (selectedPhoto) {
+      photoData = await uploadComplaintPhoto(
+        selectedPhoto,
+        reportId
+      );
+    }
+
+    setMessage(uploadStatus, "शिकायत सेव हो रही है...");
+
     const batch = writeBatch(db);
 
     batch.set(doc(db, "complaints", reportId), {
       ...complaintData,
+      ...photoData,
       reportId,
       status: "Pending",
       createdAt: serverTimestamp()
@@ -199,23 +308,39 @@ $("#complaintForm")?.addEventListener("submit", async (event) => {
     }
 
     form.reset();
+    selectedPhoto = null;
+
+    if (photoPreview) {
+      photoPreview.style.display = "none";
+      photoPreview.removeAttribute("src");
+    }
+
+    setMessage(uploadStatus, "");
+
     go("success");
 
   } catch (error) {
     console.error("Complaint submission failed:", error);
-    alert("शिकायत जमा नहीं हो सकी: " + error.message);
+
+    alert(
+      "शिकायत जमा नहीं हो सकी: " + error.message
+    );
 
   } finally {
     if (submitButton) {
       submitButton.disabled = false;
-      submitButton.textContent = originalText || "शिकायत जमा करें";
+      submitButton.textContent =
+        originalText || "शिकायत जमा करें";
     }
   }
 });
 
 // TRACK COMPLAINT
 $("#trackBtn")?.addEventListener("click", async () => {
-  const reportId = ($("#trackId")?.value || "").trim().toUpperCase();
+  const reportId = ($("#trackId")?.value || "")
+    .trim()
+    .toUpperCase();
+
   const output = $("#trackResult");
 
   if (!reportId) {
@@ -226,7 +351,9 @@ $("#trackBtn")?.addEventListener("click", async () => {
   setMessage(output, "शिकायत की स्थिति देखी जा रही है...");
 
   try {
-    const snapshot = await getDoc(doc(db, "tracking", reportId));
+    const snapshot = await getDoc(
+      doc(db, "tracking", reportId)
+    );
 
     if (!snapshot.exists()) {
       setMessage(output, "इस Report ID की शिकायत नहीं मिली।");
@@ -234,6 +361,7 @@ $("#trackBtn")?.addEventListener("click", async () => {
     }
 
     const item = snapshot.data();
+
     output.replaceChildren();
 
     const result = document.createElement("div");
@@ -246,7 +374,8 @@ $("#trackBtn")?.addEventListener("click", async () => {
     idLine.textContent = "Report ID: " + item.reportId;
 
     const typeLine = document.createElement("p");
-    typeLine.textContent = "समस्या: " + (item.type || "उपलब्ध नहीं");
+    typeLine.textContent =
+      "समस्या: " + (item.type || "उपलब्ध नहीं");
 
     const statusLabels = {
       Pending: "नई शिकायत",
@@ -258,18 +387,31 @@ $("#trackBtn")?.addEventListener("click", async () => {
     statusLine.textContent =
       "स्थिति: " + (statusLabels[item.status] || item.status);
 
-    result.append(heading, idLine, typeLine, statusLine);
+    result.append(
+      heading,
+      idLine,
+      typeLine,
+      statusLine
+    );
+
     output.append(result);
 
   } catch (error) {
     console.error("Tracking failed:", error);
-    setMessage(output, "ट्रैकिंग उपलब्ध नहीं है: " + error.message);
+
+    setMessage(
+      output,
+      "ट्रैकिंग उपलब्ध नहीं है: " + error.message
+    );
   }
 });
 
 // ADMIN LOGIN
 $("#adminLoginBtn")?.addEventListener("click", async () => {
-  const email = ($("#adminEmail")?.value || "").trim().toLowerCase();
+  const email = ($("#adminEmail")?.value || "")
+    .trim()
+    .toLowerCase();
+
   const password = $("#adminPassword")?.value || "";
   const message = $("#adminMsg");
   const button = $("#adminLoginBtn");
@@ -280,6 +422,7 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
   }
 
   if (button) button.disabled = true;
+
   setMessage(message, "लॉगिन हो रहा है...");
 
   try {
@@ -295,6 +438,7 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
     $("#adminDashboard")?.classList.remove("hidden");
 
     setMessage(message, "");
+
     await refreshAdmin();
 
   } catch (error) {
@@ -302,7 +446,8 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 
     setMessage(
       message,
-      "लॉगिन असफल: " + (error.code || "") + " " + error.message
+      "लॉगिन असफल: " +
+      (error.code || "") + " " + error.message
     );
 
     if (auth.currentUser) {
@@ -316,6 +461,9 @@ $("#adminLoginBtn")?.addEventListener("click", async () => {
 
 // RESTORE ADMIN SESSION
 onAuthStateChanged(auth, async (user) => {
+  // Anonymous users are complaint submitters, not admins
+  if (user?.isAnonymous) return;
+
   if (!user) {
     $("#adminLogin")?.classList.remove("hidden");
     $("#adminDashboard")?.classList.add("hidden");
@@ -327,12 +475,15 @@ onAuthStateChanged(auth, async (user) => {
 
     $("#adminLogin")?.classList.add("hidden");
     $("#adminDashboard")?.classList.remove("hidden");
+
     await refreshAdmin();
 
   } catch (error) {
     console.error("Session check failed:", error);
+
     $("#adminLogin")?.classList.remove("hidden");
     $("#adminDashboard")?.classList.add("hidden");
+
     await signOut(auth).catch(console.error);
   }
 });
@@ -342,6 +493,7 @@ $("#adminLogoutBtn")?.addEventListener("click", async () => {
   try {
     await signOut(auth);
     go("home");
+
   } catch (error) {
     console.error("Logout failed:", error);
     alert("Logout नहीं हो सका।");
@@ -350,10 +502,12 @@ $("#adminLogoutBtn")?.addEventListener("click", async () => {
 
 // ADMIN DASHBOARD
 async function refreshAdmin() {
-  if (!auth.currentUser) return;
+  const user = auth.currentUser;
+
+  if (!user || user.isAnonymous) return;
 
   try {
-    await isAdminUser(auth.currentUser);
+    await isAdminUser(user);
 
     const complaintsQuery = query(
       collection(db, "complaints"),
@@ -361,6 +515,7 @@ async function refreshAdmin() {
     );
 
     const snapshot = await getDocs(complaintsQuery);
+
     const complaints = snapshot.docs.map((item) => item.data());
 
     if ($("#totalCount")) {
@@ -369,17 +524,23 @@ async function refreshAdmin() {
 
     if ($("#newCount")) {
       $("#newCount").textContent =
-        complaints.filter((item) => item.status === "Pending").length;
+        complaints.filter(
+          (item) => item.status === "Pending"
+        ).length;
     }
 
     if ($("#pendingCount")) {
       $("#pendingCount").textContent =
-        complaints.filter((item) => item.status === "In Review").length;
+        complaints.filter(
+          (item) => item.status === "In Review"
+        ).length;
     }
 
     if ($("#doneCount")) {
       $("#doneCount").textContent =
-        complaints.filter((item) => item.status === "Resolved").length;
+        complaints.filter(
+          (item) => item.status === "Resolved"
+        ).length;
     }
 
     const list = $("#adminList");
@@ -400,14 +561,39 @@ async function refreshAdmin() {
       row.className = "complaint-row";
 
       const title = document.createElement("b");
-      title.textContent = `${item.reportId} · ${item.type}`;
+      title.textContent =
+        `${item.reportId} · ${item.type || "शिकायत"}`;
 
       const detail = document.createElement("p");
       detail.textContent =
-        `${item.name} · ${item.phone} · ${item.place}, ${item.district}, ${item.state}`;
+        `${item.name || ""} · ${item.phone || ""} · ` +
+        `${item.place || ""}, ${item.district || ""}, ${item.state || ""}`;
 
       const description = document.createElement("p");
       description.textContent = item.details || "";
+
+      // SHOW COMPLAINT PHOTO
+      if (item.photoURL) {
+        const photoBox = document.createElement("div");
+
+        const photo = document.createElement("img");
+        photo.src = item.photoURL;
+        photo.alt = "शिकायत के साथ भेजी गई फोटो";
+        photo.loading = "lazy";
+        photo.style.maxWidth = "250px";
+        photo.style.width = "100%";
+        photo.style.height = "auto";
+        photo.style.display = "block";
+        photo.style.margin = "10px 0";
+        photo.style.borderRadius = "10px";
+
+        photo.onerror = () => {
+          photo.alt = "फोटो लोड नहीं हो सकी";
+        };
+
+        photoBox.append(photo);
+        row.append(photoBox);
+      }
 
       const select = document.createElement("select");
 
@@ -443,35 +629,52 @@ async function refreshAdmin() {
 
         } catch (error) {
           console.error("Status update failed:", error);
+
           alert("स्थिति अपडेट नहीं हुई: " + error.message);
+
           select.disabled = false;
         }
       });
 
-      row.append(title, detail, description, select);
+      row.append(
+        title,
+        detail,
+        description,
+        select
+      );
+
       list.append(row);
     });
 
   } catch (error) {
     console.error("Admin list failed:", error);
-    setMessage($("#adminList"), "शिकायतें लोड नहीं हुईं: " + error.message);
+
+    setMessage(
+      $("#adminList"),
+      "शिकायतें लोड नहीं हुईं: " + error.message
+    );
   }
 }
 
 // COMPLAINT STATISTICS
 async function refreshStats() {
   const statsText = $("#statsText");
+
   if (!statsText) return;
 
   try {
-    const snapshot = await getDocs(collection(db, "tracking"));
+    const snapshot = await getDocs(
+      collection(db, "tracking")
+    );
 
     statsText.textContent =
       `अब तक ${snapshot.size} शिकायतें दर्ज हुई हैं।`;
 
   } catch (error) {
     console.error("Stats failed:", error);
-    statsText.textContent = "आंकड़े अभी उपलब्ध नहीं हैं।";
+
+    statsText.textContent =
+      "आंकड़े अभी उपलब्ध नहीं हैं।";
   }
 }
 
@@ -480,3 +683,4 @@ window.JALMITRA_CONTACT = {
   email: ADMIN_EMAIL,
   phone: CONTACT_PHONE
 };
+        
